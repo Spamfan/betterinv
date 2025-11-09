@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>spamfan's better inventory v9</title>
+    <title>spamfan's better inventory v10</title>
     
     <!-- PDF.js and jsPDF library CDNs -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
@@ -70,6 +70,17 @@
         
         .status-text { font-weight: 600; }
         .status-filename { font-weight: normal; font-style: italic; color: #606770; margin-left: 8px; }
+        
+        .control-section { text-align: left; margin-bottom: 15px; }
+        .control-section label { display: block; margin-bottom: 8px; font-weight: 600; color: #606770; }
+        
+        #isolate-toggle-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        #isolate-toggle-wrapper label { margin: 0 0 0 8px; font-weight: normal; }
 
         .action-buttons {
             display: flex;
@@ -88,18 +99,8 @@
             transition: background-color 0.2s;
         }
         
-        #highlight-btn {
-            background-color: #e4e6eb;
-            color: #050505;
-        }
-
-        #process-btn {
-            background-color: #1877f2;
-            color: white;
-        }
-        
-        .control-section { text-align: left; margin-bottom: 15px; }
-        .control-section label { display: block; margin-bottom: 8px; font-weight: 600; color: #606770; }
+        #highlight-btn { background-color: #e4e6eb; color: #050505; }
+        #process-btn { background-color: #1877f2; color: white; }
         
         #comments {
             width: 100%;
@@ -146,6 +147,11 @@
             <div class="status-section" id="vzw-status"><div><span class="status-text">Verizon:</span><span class="status-filename"></span></div></div>
             <div class="status-section" id="tmo-status"><div><span class="status-text">T-Mobile:</span><span class="status-filename"></span></div></div>
         </div>
+
+        <div class="control-section" id="isolate-toggle-wrapper">
+            <input type="checkbox" id="isolate-iphones">
+            <label for="isolate-iphones">Isolate iPhones</label>
+        </div>
         
         <div class="action-buttons">
             <button id="highlight-btn">Highlight Phones</button>
@@ -163,7 +169,7 @@
     <div id="emphasis-modal" class="modal-container"></div>
 
     <script>
-        document.getElementById('version-span').textContent = '(Alpha v9)';
+        document.getElementById('version-span').textContent = '(Alpha v10)';
 
         // Set workerSrc for pdf.js
         pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js`;
@@ -178,6 +184,7 @@
         // --- UI ELEMENT SELECTORS ---
         const uploadArea = document.getElementById('upload-area');
         const uploadInput = document.getElementById('upload-input');
+        const isolateIphonesCheckbox = document.getElementById('isolate-iphones');
         const highlightBtn = document.getElementById('highlight-btn');
         const processBtn = document.getElementById('process-btn');
         const commentsInput = document.getElementById('comments');
@@ -189,45 +196,50 @@
         const consolidateInventory = (inventoryList) => { const consolidationMap = new Map(); for (const [modelAndCapacity, color, quantity] of inventoryList) { const key = modelAndCapacity; if (!consolidationMap.has(key)) { consolidationMap.set(key, { modelAndCapacity, details: [] }); } const abbreviated = abbreviateColor(color); consolidationMap.get(key).details.push({ color: abbreviated, quantity }); } const consolidatedList = []; for (const value of consolidationMap.values()) { const detailsString = value.details.map(d => `${d.quantity} ${d.color}`).join(', '); consolidatedList.push([value.modelAndCapacity, detailsString]); } return consolidatedList; };
         const categorizePdf = (text) => { const lowerCaseText = text.toLowerCase(); if (lowerCaseText.includes('at&t')) return 'att'; if (lowerCaseText.includes('verizon') || lowerCaseText.includes('vzw')) return 'vzw'; if (lowerCaseText.includes('t-mobile') || lowerCaseText.includes('tmo')) return 'tmo'; return 'unknown'; };
 
-        const generateFinalPdf = (state, comments) => {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-            const topMargin = 12.7, sideMargin = 6.35, bottomMargin = 6.35;
-            const pageHeight = 297, lineHeight = 4.5, sectionSpacing = 7;
-            const headerHeight = 6, listTopMargin = 2;
-            let yPosition = topMargin;
+        const prepareDataForDisplay = () => {
+            const preparedState = {
+                att: { consolidatedList: [], emphasis: appState.att.emphasis },
+                vzw: { consolidatedList: [], emphasis: appState.vzw.emphasis },
+                tmo: { consolidatedList: [], emphasis: appState.tmo.emphasis }
+            };
 
-            // --- Draw Header ---
-            const timestamp = new Date().toLocaleString();
-            doc.setFont("helvetica", "normal").setFontSize(8).text(timestamp, sideMargin, yPosition);
-            yPosition += lineHeight;
-            if (comments) { const splitComments = doc.splitTextToSize(comments, 190); doc.setFont("helvetica", "italic").text(splitComments, sideMargin, yPosition); yPosition += (splitComments.length * (lineHeight - 1)); }
-            yPosition += sectionSpacing;
-            const contentStartY = yPosition;
+            if (isolateIphonesCheckbox.checked) {
+                const iphoneSourcePriority = ['att', 'vzw', 'tmo'];
+                const iphoneSourceCarrier = iphoneSourcePriority.find(c => appState[c].consolidatedList.length > 0);
+                
+                preparedState.apple = { consolidatedList: [], emphasis: iphoneSourceCarrier ? appState[iphoneSourceCarrier].emphasis : new Map() };
 
-            // --- Smart Layout Calculation & Drawing ---
-            const calculateSectionHeight = (list) => { if (!list || list.length === 0) return 0; return headerHeight + listTopMargin + (list.length * lineHeight) + sectionSpacing; };
-            const leftColumnHeight = calculateSectionHeight(state.att.consolidatedList) + calculateSectionHeight(state.vzw.consolidatedList);
-            const rightColumnHeight = calculateSectionHeight(state.tmo.consolidatedList);
-            const availablePageHeight = pageHeight - contentStartY - bottomMargin;
-            const useTwoColumnLayout = (leftColumnHeight <= availablePageHeight) && (rightColumnHeight <= availablePageHeight) && (rightColumnHeight > 0);
-            const drawSection = (carrier, data, currentX) => { doc.setFont("helvetica", "bold").setFontSize(10); const headerText = carrier.toUpperCase(); const headerWidth = doc.getTextWidth(headerText); doc.text(headerText, currentX, yPosition); doc.setLineWidth(0.2).line(currentX, yPosition + 0.5, currentX + headerWidth, yPosition + 0.5); yPosition += headerHeight; doc.setFontSize(8); const modelX = currentX; const detailsX = currentX + 55; data.consolidatedList.forEach(item => { const [modelAndCapacity, details] = item; const itemKey = modelAndCapacity; const emphasisState = data.emphasis.get(itemKey) || { highlight: false, bold: false }; const fontStyle = emphasisState.bold ? 'bold' : 'normal'; doc.setFont('helvetica', fontStyle); if (emphasisState.highlight) { const textDimensions = doc.getTextDimensions(details, { fontSize: 8, fontStyle: fontStyle }); const rectWidth = (detailsX - modelX) + textDimensions.w + 2; const rectHeight = textDimensions.h + 0.5; const rectY = yPosition - textDimensions.h; doc.setFillColor(230, 230, 230); doc.rect(modelX - 1, rectY, rectWidth, rectHeight, 'F'); } doc.text(modelAndCapacity, modelX, yPosition); doc.text(details, detailsX, yPosition); yPosition += lineHeight; }); yPosition += sectionSpacing; };
-            const carriersWithData = ['att', 'vzw', 'tmo'].filter(c => state[c].consolidatedList.length > 0);
-            if (useTwoColumnLayout) { carriersWithData.forEach(carrier => { if (carrier === 'tmo') { yPosition = contentStartY; } drawSection(carrier, state[carrier], carrier === 'tmo' ? 110 : sideMargin); }); } else { carriersWithData.forEach(carrier => { const sectionHeight = calculateSectionHeight(state[carrier].consolidatedList); if (yPosition + sectionHeight > (pageHeight - bottomMargin)) { doc.addPage(); yPosition = topMargin; doc.setFont("helvetica", "normal").setFontSize(8).text(timestamp, sideMargin, yPosition); yPosition += lineHeight; if (comments) { const splitComments = doc.splitTextToSize(comments, 190); doc.setFont("helvetica", "italic").text(splitComments, sideMargin, yPosition); yPosition += (splitComments.length * (lineHeight-1)); } yPosition += sectionSpacing; } drawSection(carrier, state[carrier], sideMargin); }); }
-            if (carriersWithData.length === 0) { doc.setFont("helvetica", "normal").setFontSize(12).text("No inventory found.", sideMargin, yPosition); }
-            return doc.output('datauristring');
+                for (const carrier of ['att', 'vzw', 'tmo']) {
+                    if (appState[carrier].consolidatedList.length > 0) {
+                        const iphones = appState[carrier].consolidatedList.filter(item => item[0].toLowerCase().startsWith('iphone'));
+                        const others = appState[carrier].consolidatedList.filter(item => !item[0].toLowerCase().startsWith('iphone'));
+                        preparedState[carrier].consolidatedList = others;
+
+                        if (carrier === iphoneSourceCarrier) {
+                            preparedState.apple.consolidatedList = iphones;
+                        }
+                    }
+                }
+            } else {
+                preparedState.att.consolidatedList = appState.att.consolidatedList;
+                preparedState.vzw.consolidatedList = appState.vzw.consolidatedList;
+                preparedState.tmo.consolidatedList = appState.tmo.consolidatedList;
+            }
+            return preparedState;
         };
+
+        const generateFinalPdf = (state, comments) => { /* ... identical to v9 but uses prepared state ... */ const { jsPDF } = window.jspdf; const doc = new jsPDF(); const topMargin = 12.7, sideMargin = 6.35, bottomMargin = 6.35; const pageHeight = 297, lineHeight = 4.5, sectionSpacing = 7; const headerHeight = 6, listTopMargin = 2; let yPosition = topMargin; const timestamp = new Date().toLocaleString(); doc.setFont("helvetica", "normal").setFontSize(8).text(timestamp, sideMargin, yPosition); yPosition += lineHeight; if (comments) { const splitComments = doc.splitTextToSize(comments, 190); doc.setFont("helvetica", "italic").text(splitComments, sideMargin, yPosition); yPosition += (splitComments.length * (lineHeight - 1)); } yPosition += sectionSpacing; const contentStartY = yPosition; const calculateSectionHeight = (list) => { if (!list || list.length === 0) return 0; return headerHeight + listTopMargin + (list.length * lineHeight) + sectionSpacing; }; const carriersForLayout = Object.keys(state).filter(c => state[c].consolidatedList.length > 0); const leftColumnCarriers = carriersForLayout.filter(c => c !== 'apple' && c !== 'tmo'); const rightColumnCarriers = carriersForLayout.filter(c => c === 'apple' || c === 'tmo'); let leftColumnHeight = 0; leftColumnCarriers.forEach(c => leftColumnHeight += calculateSectionHeight(state[c].consolidatedList)); let rightColumnHeight = 0; rightColumnCarriers.forEach(c => rightColumnHeight += calculateSectionHeight(state[c].consolidatedList)); const availablePageHeight = pageHeight - contentStartY - bottomMargin; const useTwoColumnLayout = (leftColumnHeight <= availablePageHeight) && (rightColumnHeight <= availablePageHeight) && (rightColumnHeight > 0); const drawSection = (carrier, data, currentX) => { doc.setFont("helvetica", "bold").setFontSize(10); const headerText = (carrier === 'apple') ? 'Apple Devices' : carrier.toUpperCase(); const headerWidth = doc.getTextWidth(headerText); doc.text(headerText, currentX, yPosition); doc.setLineWidth(0.2).line(currentX, yPosition + 0.5, currentX + headerWidth, yPosition + 0.5); yPosition += headerHeight; doc.setFontSize(8); const modelX = currentX; const detailsX = currentX + 55; data.consolidatedList.forEach(item => { const [modelAndCapacity, details] = item; const itemKey = modelAndCapacity; const emphasisState = data.emphasis.get(itemKey) || { highlight: false, bold: false }; const fontStyle = emphasisState.bold ? 'bold' : 'normal'; doc.setFont('helvetica', fontStyle); if (emphasisState.highlight) { const textDimensions = doc.getTextDimensions(details, { fontSize: 8, fontStyle: fontStyle }); const rectWidth = (detailsX - modelX) + textDimensions.w + 2; const rectHeight = textDimensions.h + 0.5; const rectY = yPosition - textDimensions.h; doc.setFillColor(230, 230, 230); doc.rect(modelX - 1, rectY, rectWidth, rectHeight, 'F'); } doc.text(modelAndCapacity, modelX, yPosition); doc.text(details, detailsX, yPosition); yPosition += lineHeight; }); yPosition += sectionSpacing; }; if (useTwoColumnLayout) { leftColumnCarriers.forEach(c => drawSection(c, state[c], sideMargin)); yPosition = contentStartY; rightColumnCarriers.forEach(c => drawSection(c, state[c], 110)); } else { carriersForLayout.forEach(carrier => { const sectionHeight = calculateSectionHeight(state[carrier].consolidatedList); if (yPosition + sectionHeight > (pageHeight - bottomMargin)) { doc.addPage(); yPosition = topMargin; doc.setFont("helvetica", "normal").setFontSize(8).text(timestamp, sideMargin, yPosition); yPosition += lineHeight; if (comments) { const splitComments = doc.splitTextToSize(comments, 190); doc.setFont("helvetica", "italic").text(splitComments, sideMargin, yPosition); yPosition += (splitComments.length * (lineHeight-1)); } yPosition += sectionSpacing; } drawSection(carrier, state[carrier], sideMargin); }); } if (carriersForLayout.length === 0) { doc.setFont("helvetica", "normal").setFontSize(12).text("No inventory found.", sideMargin, yPosition); } return doc.output('datauristring');};
 
         // --- DYNAMIC UI & EVENT HANDLERS ---
         document.getElementById('preview-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h2>PDF Preview</h2><span class="close-btn" id="preview-close-btn">&times;</span></div><div class="modal-body"><iframe id="pdf-preview-iframe" frameborder="0"></iframe></div><div class="modal-footer"><button id="print-btn">Print</button><button id="download-btn">Download</button></div></div>`;
         document.getElementById('emphasis-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h2 id="emphasis-modal-title">Highlight Inventory</h2><span class="close-btn" id="emphasis-close-btn">&times;</span></div><div class="modal-body"><div class="emphasis-header"><div class="emphasis-header-bold">Bold</div><div class="emphasis-header-highlight">Highlight</div><div class="emphasis-header-text">Item</div></div><div id="emphasis-list-container"></div></div><div class="modal-footer"><button id="emphasis-done-btn">Done</button></div></div>`;
         const previewModal = document.getElementById('preview-modal'), emphasisModal = document.getElementById('emphasis-modal'), iframe = document.getElementById('pdf-preview-iframe');
         const handleFileUploads = async (files) => { if (!files || files.length === 0) return; uploadArea.querySelector('p').textContent = 'Processing...'; for (const file of files) { try { const text = await getTextFromPdf(file); const carrier = categorizePdf(text); if (carrier === 'unknown') { alert(`Could not determine carrier for file: ${file.name}`); continue; } const parsedList = parseInventoryText(text); appState[carrier].consolidatedList = consolidateInventory(parsedList); appState[carrier].emphasis.clear(); const statusSection = document.getElementById(`${carrier}-status`); statusSection.querySelector('.status-filename').textContent = file.name; statusSection.style.display = 'block'; } catch (error) { alert(`Failed to process file: ${file.name}`); console.error(error); } } uploadArea.querySelector('p').textContent = 'Click to select more, or drag & drop files here.'; };
-        const openEmphasisModal = () => { const listContainer = document.getElementById('emphasis-list-container'); listContainer.innerHTML = ''; const carriersWithData = ['att', 'vzw', 'tmo'].filter(c => appState[c].consolidatedList.length > 0); carriersWithData.forEach(carrier => { const header = document.createElement('div'); header.className = 'emphasis-list-carrier-header'; header.textContent = carrier.toUpperCase(); listContainer.appendChild(header); appState[carrier].consolidatedList.forEach(item => { const [modelAndCapacity, details] = item; const itemKey = modelAndCapacity; const currentEmphasis = appState[carrier].emphasis.get(itemKey) || { highlight: false, bold: false }; const itemDiv = document.createElement('div'); itemDiv.className = 'emphasis-item'; const boldCheckbox = document.createElement('input'); boldCheckbox.type = 'checkbox'; boldCheckbox.checked = currentEmphasis.bold; boldCheckbox.addEventListener('change', (e) => { const state = appState[carrier].emphasis.get(itemKey) || { highlight: false, bold: false }; state.bold = e.target.checked; appState[carrier].emphasis.set(itemKey, state); }); const highlightCheckbox = document.createElement('input'); highlightCheckbox.type = 'checkbox'; highlightCheckbox.checked = currentEmphasis.highlight; highlightCheckbox.addEventListener('change', (e) => { const state = appState[carrier].emphasis.get(itemKey) || { highlight: false, bold: false }; state.highlight = e.target.checked; appState[carrier].emphasis.set(itemKey, state); }); const textDiv = document.createElement('div'); textDiv.className = 'emphasis-item-text'; textDiv.textContent = `${modelAndCapacity} - ${details}`; itemDiv.appendChild(boldCheckbox); itemDiv.appendChild(highlightCheckbox); itemDiv.appendChild(textDiv); listContainer.appendChild(itemDiv); }); }); emphasisModal.style.display = 'flex'; };
+        const openEmphasisModal = () => { const listContainer = document.getElementById('emphasis-list-container'); listContainer.innerHTML = ''; const processedData = prepareDataForDisplay(); const carriersToDisplay = Object.keys(processedData).filter(c => processedData[c].consolidatedList.length > 0); carriersToDisplay.forEach(carrier => { const header = document.createElement('div'); header.className = 'emphasis-list-carrier-header'; header.textContent = (carrier === 'apple') ? 'Apple Devices' : carrier.toUpperCase(); listContainer.appendChild(header); processedData[carrier].consolidatedList.forEach(item => { const [modelAndCapacity, details] = item; const itemKey = modelAndCapacity; const currentEmphasis = processedData[carrier].emphasis.get(itemKey) || { highlight: false, bold: false }; const itemDiv = document.createElement('div'); itemDiv.className = 'emphasis-item'; const boldCheckbox = document.createElement('input'); boldCheckbox.type = 'checkbox'; boldCheckbox.checked = currentEmphasis.bold; boldCheckbox.addEventListener('change', (e) => { const state = processedData[carrier].emphasis.get(itemKey) || { highlight: false, bold: false }; state.bold = e.target.checked; processedData[carrier].emphasis.set(itemKey, state); }); const highlightCheckbox = document.createElement('input'); highlightCheckbox.type = 'checkbox'; highlightCheckbox.checked = currentEmphasis.highlight; highlightCheckbox.addEventListener('change', (e) => { const state = processedData[carrier].emphasis.get(itemKey) || { highlight: false, bold: false }; state.highlight = e.target.checked; processedData[carrier].emphasis.set(itemKey, state); }); const textDiv = document.createElement('div'); textDiv.className = 'emphasis-item-text'; textDiv.textContent = `${modelAndCapacity} - ${details}`; itemDiv.appendChild(boldCheckbox); itemDiv.appendChild(highlightCheckbox); itemDiv.appendChild(textDiv); listContainer.appendChild(itemDiv); }); }); emphasisModal.style.display = 'flex'; };
         
         // --- Attach Event Listeners ---
         highlightBtn.addEventListener('click', openEmphasisModal);
-        processBtn.addEventListener('click', () => { const comments = commentsInput.value; const pdfDataUri = generateFinalPdf(appState, comments); iframe.src = pdfDataUri; previewModal.style.display = 'flex'; });
+        processBtn.addEventListener('click', () => { const processedData = prepareDataForDisplay(); const comments = commentsInput.value; const pdfDataUri = generateFinalPdf(processedData, comments); iframe.src = pdfDataUri; previewModal.style.display = 'flex'; });
         uploadArea.addEventListener('click', () => uploadInput.click());
         uploadInput.addEventListener('change', (e) => handleFileUploads(e.target.files));
         uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
