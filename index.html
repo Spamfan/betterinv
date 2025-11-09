@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>spamfan's better inventory v1</title>
+    <title>spamfan's better inventory v6</title>
     
     <!-- PDF.js and jsPDF library CDNs -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
@@ -37,13 +37,17 @@
             margin-bottom: 25px;
             font-size: 1.8em;
         }
+        
+        #version-span {
+            font-weight: normal;
+        }
 
         .upload-section {
             margin-bottom: 20px;
             text-align: left;
         }
 
-        .upload-section label {
+        .upload-section label, .control-section label {
             display: block;
             margin-bottom: 8px;
             font-weight: 600;
@@ -53,11 +57,19 @@
         .input-wrapper {
             display: flex;
             gap: 10px;
+            border: 2px dashed #dddfe2;
+            border-radius: 8px;
+            padding: 5px;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+        
+        .input-wrapper.dragover {
+            border-color: #1877f2;
+            background-color: #f0f8ff;
         }
 
         input[type="file"] {
             flex-grow: 1;
-            width: 100%;
             padding: 10px;
             border: 1px solid #dddfe2;
             border-radius: 6px;
@@ -90,148 +102,84 @@
             cursor: pointer;
             width: 100%;
             transition: background-color 0.2s;
+            margin-bottom: 20px;
+        }
+        
+        .control-section {
+            text-align: left;
+            margin-bottom: 15px;
+        }
+        
+        #comments {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #dddfe2;
+            border-radius: 6px;
+            box-sizing: border-box;
+            resize: vertical;
+            min-height: 60px;
+        }
+        
+        #debug-toggle-wrapper {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
         }
 
-        #process-btn:hover {
-            background-color: #166fe5;
+        #debug-toggle-wrapper label {
+            margin: 0 0 0 8px;
+            font-weight: normal;
+        }
+        
+        #debug-console {
+            display: none;
+            margin-top: 25px;
+            text-align: left;
         }
 
-        /* Responsive Design */
-        @media (max-width: 600px) {
-            #app-container {
-                padding: 20px;
-            }
-            h1 {
-                font-size: 1.5em;
-            }
-            .modal-content {
-                width: 95%;
-                height: 85%;
-            }
+        #debug-console h3 { margin-top: 0; font-size: 1.1em; color: #606770; }
+
+        #debug-output {
+            background-color: #e9ebee;
+            border: 1px solid #dddfe2;
+            border-radius: 6px;
+            padding: 10px;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-family: "Courier New", Courier, monospace;
+            font-size: 0.9em;
+            color: #1c1e21;
         }
 
         /* Modal Styles */
-        .modal-container {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.5);
-            justify-content: center;
-            align-items: center;
-        }
-
-        .modal-content {
-            background-color: #fefefe;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            width: 80%;
-            max-width: 600px;
-            max-height: 90%;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .modal-header {
-            padding: 10px 20px;
-            border-bottom: 1px solid #ddd;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .modal-header h2 {
-            margin: 0;
-            font-size: 1.2em;
-        }
-
-        .close-btn {
-            color: #aaa;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-        
-        .emphasis-header {
-            padding: 10px 20px;
-            border-bottom: 1px solid #ddd;
-            display: flex;
-            font-weight: bold;
-            font-size: 0.8em;
-            color: #606770;
-            background-color: #f0f2f5;
-        }
-        
-        .emphasis-header-box, .emphasis-header-bold {
-            min-width: 40px;
-            text-align: center;
-        }
-        
-        .emphasis-header-text {
-            flex-grow: 1;
-            padding-left: 5px;
-        }
-
-        .modal-body {
-            flex-grow: 1;
-            padding: 0;
-            overflow-y: auto;
-        }
-        
-        #emphasis-list-container {
-            padding: 5px 20px;
-        }
-
-        #pdf-preview-iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-        }
-        
-        .emphasis-item {
-            display: flex;
-            align-items: center;
-            padding: 8px 0;
-            border-bottom: 1px solid #e9ebee;
-        }
-        
-        .emphasis-item input[type="checkbox"] {
-            min-width: 40px;
-            height: 18px;
-            margin: 0;
-        }
-        
-        .emphasis-item-text {
-            font-size: 0.9em;
-            padding-left: 5px;
-        }
-
-        .modal-footer {
-            padding: 15px 20px;
-            border-top: 1px solid #ddd;
-            text-align: right;
-        }
-        
-        .modal-footer button {
-            padding: 10px 20px;
-            border-radius: 5px;
-            border: none;
-            cursor: pointer;
-            font-weight: bold;
-        }
+        .modal-container { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+        .modal-content { background-color: #fefefe; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); width: 80%; max-width: 600px; max-height: 90%; display: flex; flex-direction: column; }
+        .modal-header { padding: 10px 20px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
+        .modal-header h2 { margin: 0; font-size: 1.2em; }
+        .close-btn { color: #aaa; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .emphasis-header { padding: 10px 20px; border-bottom: 1px solid #ddd; display: flex; font-weight: bold; font-size: 0.8em; color: #606770; background-color: #f0f2f5; }
+        .emphasis-header-bold, .emphasis-header-box { min-width: 40px; text-align: center; }
+        .emphasis-header-text { flex-grow: 1; padding-left: 5px; }
+        .modal-body { flex-grow: 1; padding: 0; overflow-y: auto; }
+        #emphasis-list-container { padding: 5px 20px; }
+        #pdf-preview-iframe { width: 100%; height: 100%; border: none; }
+        .emphasis-item { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid #e9ebee; }
+        .emphasis-item input[type="checkbox"] { min-width: 40px; height: 18px; margin: 0; }
+        .emphasis-item-text { font-size: 0.9em; padding-left: 5px; }
+        .modal-footer { padding: 15px 20px; border-top: 1px solid #ddd; text-align: right; }
+        .modal-footer button { padding: 10px 20px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div id="app-container">
-        <h1>spamfan's better inventory</h1>
+        <h1>Spamfan's better inventory <span id="version-span"></span></h1>
         
         <div class="upload-section">
             <label for="att-pdf">AT&T PDF:</label>
-            <div class="input-wrapper">
+            <div class="input-wrapper" id="att-drop-zone">
                 <input type="file" id="att-pdf" data-carrier="att" accept=".pdf">
                 <button class="emphasize-btn" id="att-emphasize-btn" data-carrier="att" disabled>Emphasize</button>
             </div>
@@ -239,7 +187,7 @@
         
         <div class="upload-section">
             <label for="vzw-pdf">Verizon PDF:</label>
-            <div class="input-wrapper">
+            <div class="input-wrapper" id="vzw-drop-zone">
                 <input type="file" id="vzw-pdf" data-carrier="vzw" accept=".pdf">
                 <button class="emphasize-btn" id="vzw-emphasize-btn" data-carrier="vzw" disabled>Emphasize</button>
             </div>
@@ -247,59 +195,36 @@
         
         <div class="upload-section">
             <label for="tmo-pdf">T-Mobile PDF:</label>
-            <div class="input-wrapper">
+            <div class="input-wrapper" id="tmo-drop-zone">
                 <input type="file" id="tmo-pdf" data-carrier="tmo" accept=".pdf">
                 <button class="emphasize-btn" id="tmo-emphasize-btn" data-carrier="tmo" disabled>Emphasize</button>
             </div>
         </div>
         
         <button id="process-btn">Generate Combined PDF</button>
-    </div>
 
-    <!-- PDF Preview Modal -->
-    <div id="preview-modal" class="modal-container">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="preview-modal-title">PDF Preview</h2>
-                <span class="close-btn" id="preview-close-btn">&times;</span>
-            </div>
-            <div class="modal-body">
-                <iframe id="pdf-preview-iframe" frameborder="0"></iframe>
-            </div>
-            <div class="modal-footer">
-                <button id="print-btn">Print</button>
-                <button id="download-btn">Download</button>
-            </div>
+        <div class="control-section">
+            <label for="comments">Comments (optional)</label>
+            <textarea id="comments"></textarea>
         </div>
-    </div>
-    
-    <!-- Emphasis Modal -->
-    <div id="emphasis-modal" class="modal-container">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="emphasis-modal-title">Emphasize Inventory</h2>
-                <span class="close-btn" id="emphasis-close-btn">&times;</span>
-            </div>
-            <div class="modal-body">
-                <div class="emphasis-header">
-                    <div class="emphasis-header-box">Box</div>
-                    <div class="emphasis-header-bold">Bold</div>
-                    <div class="emphasis-header-text">Item</div>
-                </div>
-                <div id="emphasis-list-container">
-                    <!-- Checkbox list will be dynamically generated here -->
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button id="emphasis-done-btn">Done</button>
-            </div>
+        
+        <div class="control-section" id="debug-toggle-wrapper">
+            <input type="checkbox" id="debug-toggle">
+            <label for="debug-toggle">Show Debug Console</label>
+        </div>
+
+        <div id="debug-console">
+            <h3>Debug Log</h3>
+            <pre id="debug-output"></pre>
         </div>
     </div>
 
+    <!-- Modals are empty here, populated by script -->
+    <div id="preview-modal" class="modal-container"></div>
+    <div id="emphasis-modal" class="modal-container"></div>
 
     <script>
-        // Set workerSrc for pdf.js
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js`;
+        document.getElementById('version-span').textContent = '(Alpha v6)';
 
         // --- GLOBAL STATE ---
         const appState = {
@@ -309,246 +234,119 @@
         };
 
         // --- UI ELEMENT SELECTORS ---
-        const fileInputs = document.querySelectorAll('input[type="file"]');
-        const emphasizeBtns = document.querySelectorAll('.emphasize-btn');
-        const processBtn = document.getElementById('process-btn');
-        
-        const previewModal = document.getElementById('preview-modal');
-        const previewCloseBtn = document.getElementById('preview-close-btn');
-        const iframe = document.getElementById('pdf-preview-iframe');
-        const downloadBtn = document.getElementById('download-btn');
-        const printBtn = document.getElementById('print-btn');
-        
-        const emphasisModal = document.getElementById('emphasis-modal');
-        const emphasisCloseBtn = document.getElementById('emphasis-close-btn');
-        const emphasisDoneBtn = document.getElementById('emphasis-done-btn');
-        const emphasisListContainer = document.getElementById('emphasis-list-container');
-        const emphasisModalTitle = document.getElementById('emphasis-modal-title');
+        const debugConsole = document.getElementById('debug-console');
+        const debugOutput = document.getElementById('debug-output');
+        const commentsInput = document.getElementById('comments');
+        const logToScreen = (message) => { debugOutput.textContent += message + '\n\n'; };
 
         // --- CORE LOGIC ---
 
-        const getTextFromPdf = (file) => {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = async (event) => {
-                    try {
-                        const pdf = await pdfjsLib.getDocument({ data: event.target.result }).promise;
-                        let textContent = '';
-                        for (let i = 1; i <= pdf.numPages; i++) {
-                            const page = await pdf.getPage(i);
-                            const text = await page.getTextContent();
-                            textContent += text.items.map(s => s.str).join(' ');
-                        }
-                        resolve(textContent);
-                    } catch (error) { reject(error); }
-                };
-                reader.onerror = (error) => reject(error);
-                reader.readAsArrayBuffer(file);
-            });
-        };
+        const getTextFromPdf = (file) => { /* ... identical to v5 ... */ return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = async (event) => { try { const pdf = await pdfjsLib.getDocument({ data: event.target.result }).promise; let textContent = ''; for (let i = 1; i <= pdf.numPages; i++) { const page = await pdf.getPage(i); const text = await page.getTextContent(); textContent += text.items.map(s => s.str).join(' '); } resolve(textContent); } catch (error) { reject(error); } }; reader.onerror = (error) => reject(error); reader.readAsArrayBuffer(file); }); };
+        const parseInventoryText = (text) => { /* ... identical to v4 ... */ if (!text) return []; const dataStartIndex = text.indexOf('Quantity'); if (dataStartIndex === -1) return []; const dataText = text.substring(dataStartIndex + 'Quantity'.length); const inventoryRegex = /(.+?)\s+(\d+\s?GB)\s+([a-zA-Z\s]+?)\s+(\d+\s+available)/g; const matches = [...dataText.matchAll(inventoryRegex)]; const inventory = []; const unlockedRegex = /unlock\s?ed/i; for (const match of matches) { if (!unlockedRegex.test(match[0])) { const model = match[1].trim(); const capacity = match[2].trim(); const modelAndCapacity = `${model} ${capacity}`; const color = match[3].trim(); const quantity = match[4].match(/\d+/)[0]; inventory.push([modelAndCapacity, color, quantity]); } } return inventory; };
+        const abbreviateColor = (color) => { /* ... identical to v3 ... */ const c = color.toLowerCase(); if (c.includes('titanium') && c.includes('black')) return 'Black'; if (c.includes('space black')) return 'Black'; if (c.includes('sky blue') || c.includes('deep blue') || c.includes('ultramarine')) return 'Blue'; if (c.includes('titanium')) return c.split(' ')[0].charAt(0).toUpperCase() + c.split(' ')[0].slice(1); if (c.includes('orange')) return 'Orange'; return color.split(' ')[0].charAt(0).toUpperCase() + color.split(' ')[0].slice(1); };
+        const consolidateInventory = (inventoryList) => { /* ... identical to v4 ... */ const consolidationMap = new Map(); for (const [modelAndCapacity, color, quantity] of inventoryList) { const key = modelAndCapacity; if (!consolidationMap.has(key)) { consolidationMap.set(key, { modelAndCapacity, details: [] }); } const abbreviated = abbreviateColor(color); consolidationMap.get(key).details.push({ color: abbreviated, quantity }); } const consolidatedList = []; for (const value of consolidationMap.values()) { const detailsString = value.details.map(d => `${d.quantity} ${d.color}`).join(', '); consolidatedList.push([value.modelAndCapacity, detailsString]); } return consolidatedList; };
 
-        const parseInventoryText = (text) => {
-            if (!text) return [];
-            const dataStartIndex = text.indexOf('Quantity');
-            if (dataStartIndex === -1) return [];
-            const dataText = text.substring(dataStartIndex + 'Quantity'.length);
-            const inventoryRegex = /(.+?)\s+(\d+\s?GB)\s+([a-zA-Z\s]+?)\s+(\d+\s+available)/g;
-            const matches = [...dataText.matchAll(inventoryRegex)];
-            const inventory = [];
-            const unlockedRegex = /unlocked/i;
-            for (const match of matches) {
-                if (!unlockedRegex.test(match[0])) {
-                    const [model, capacity, color, quantity] = [match[1].trim(), match[2].trim(), match[3].trim(), match[4].match(/\d+/)[0]];
-                    inventory.push([model, capacity, color, quantity]);
-                }
-            }
-            return inventory;
-        };
-        
-        const consolidateInventory = (inventoryList) => {
-            const consolidationMap = new Map();
-            for (const [model, capacity, color, quantity] of inventoryList) {
-                const key = `${model}|${capacity}`;
-                if (!consolidationMap.has(key)) {
-                    consolidationMap.set(key, { model, capacity, details: [] });
-                }
-                consolidationMap.get(key).details.push({ color, quantity });
-            }
-            const consolidatedList = [];
-            for (const value of consolidationMap.values()) {
-                const detailsString = value.details.map(d => `${d.quantity} ${d.color}`).join(', ');
-                consolidatedList.push([value.model, value.capacity, detailsString]);
-            }
-            return consolidatedList;
-        };
-
-        const generateFinalPdf = (state) => {
+        const generateFinalPdf = (state, comments) => {
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-            const margin = 6.35;
-            const pageHeight = 297;
-            const lineHeight = 5;
-            const sectionSpacing = 8;
-            let yPosition = margin;
+            const topMargin = 12.7, sideMargin = 6.35, bottomMargin = 6.35;
+            const pageHeight = 297, lineHeight = 4.5, sectionSpacing = 7;
+            const headerHeight = 6, listTopMargin = 2;
+            let yPosition = topMargin;
 
-            const checkPageBreak = (requiredHeight) => {
-                if (yPosition + requiredHeight > (pageHeight - margin)) {
-                    doc.addPage();
-                    yPosition = margin;
-                }
+            // --- Draw Header ---
+            const timestamp = new Date().toLocaleString();
+            doc.setFont("helvetica", "normal").setFontSize(8).text(timestamp, sideMargin, yPosition);
+            yPosition += lineHeight;
+
+            if (comments) {
+                doc.setFont("helvetica", "italic");
+                const splitComments = doc.splitTextToSize(comments, 190); // Wrap comments
+                doc.text(splitComments, sideMargin, yPosition);
+                yPosition += (splitComments.length * lineHeight);
+            }
+            yPosition += sectionSpacing; // Space before inventory
+
+            const contentStartY = yPosition; // The real start of inventory lists
+
+            // --- Smart Layout Calculation ---
+            const calculateSectionHeight = (list) => {
+                if (!list || list.length === 0) return 0;
+                return headerHeight + listTopMargin + (list.length * lineHeight) + sectionSpacing;
             };
+            const leftColumnHeight = calculateSectionHeight(state.att.consolidatedList) + calculateSectionHeight(state.vzw.consolidatedList);
+            const rightColumnHeight = calculateSectionHeight(state.tmo.consolidatedList);
+            const availablePageHeight = pageHeight - contentStartY - bottomMargin;
+            const useTwoColumnLayout = (leftColumnHeight <= availablePageHeight) && (rightColumnHeight <= availablePageHeight) && (rightColumnHeight > 0);
+            
+            logToScreen("--- Starting PDF Generation (v6) ---");
+            logToScreen(`Available Page Height (after header): ${availablePageHeight.toFixed(2)}mm`);
+            logToScreen(`Left Column (ATT+VZW) Calculated Height: ${leftColumnHeight.toFixed(2)}mm`);
+            logToScreen(`Right Column (TMO) Calculated Height: ${rightColumnHeight.toFixed(2)}mm`);
+            logToScreen(`Decision: Use Two-Column Layout? ${useTwoColumnLayout}`);
 
-            for (const carrier of ['att', 'vzw', 'tmo']) {
-                const data = state[carrier];
-                if (data.consolidatedList.length > 0) {
-                    const sectionHeight = (data.consolidatedList.length * lineHeight) + 8; // title height
-                    checkPageBreak(sectionHeight);
-                    
-                    doc.setFont("helvetica", "bold");
-                    doc.setFontSize(14);
-                    doc.text(carrier.toUpperCase(), margin, yPosition);
-                    yPosition += 6;
+            const drawSection = (carrier, data, currentX) => {
+                doc.setFont("helvetica", "bold").setFontSize(10);
+                const headerText = carrier.toUpperCase();
+                const headerWidth = doc.getTextWidth(headerText);
+                doc.text(headerText, currentX, yPosition);
+                doc.setLineWidth(0.2).line(currentX, yPosition + 0.5, currentX + headerWidth, yPosition + 0.5);
+                yPosition += headerHeight;
 
-                    doc.setFontSize(10);
-                    
-                    const modelX = margin;
-                    const capacityX = 65;
-                    const detailsX = 85;
+                doc.setFontSize(8);
+                const modelX = currentX;
+                const detailsX = currentX + 55;
 
-                    data.consolidatedList.forEach(item => {
-                        const [model, capacity, details] = item;
-                        const itemKey = `${model}|${capacity}`;
-                        const emphasisState = data.emphasis.get(itemKey) || { box: false, bold: false };
+                data.consolidatedList.forEach(item => { /* ... identical to v5 ... */ const [modelAndCapacity, details] = item; const itemKey = modelAndCapacity; const emphasisState = data.emphasis.get(itemKey) || { box: false, bold: false }; const fontStyle = emphasisState.bold ? 'bold' : 'normal'; doc.setFont('helvetica', fontStyle); const textDimensions = doc.getTextDimensions(details, { fontSize: 8, fontStyle: fontStyle }); if (emphasisState.box) { const boxWidth = (detailsX - modelX) + textDimensions.w + 1; const boxHeight = textDimensions.h; const boxY = yPosition - textDimensions.h + 0.4; doc.setDrawColor(0).rect(modelX - 1, boxY, boxWidth, boxHeight); } doc.text(modelAndCapacity, modelX, yPosition); doc.text(details, detailsX, yPosition); yPosition += lineHeight; });
+                yPosition += sectionSpacing;
+            };
+            
+            const carriersWithData = ['att', 'vzw', 'tmo'].filter(c => state[c].consolidatedList.length > 0);
 
-                        const fontStyle = emphasisState.bold ? 'bold' : 'normal';
-                        doc.setFont('helvetica', fontStyle);
-
-                        if (emphasisState.box) {
-                            const detailsWidth = doc.getTextWidth(details);
-                            const boxWidth = (detailsX - margin) + detailsWidth + 1;
-                            const boxHeight = lineHeight - 1;
-                            doc.setDrawColor(0);
-                            doc.rect(margin - 1, yPosition - boxHeight + 1, boxWidth, boxHeight);
-                        }
-                        
-                        doc.text(model, modelX, yPosition);
-                        doc.text(capacity, capacityX, yPosition);
-                        doc.text(details, detailsX, yPosition);
-                        
+            if (useTwoColumnLayout) {
+                drawSection('att', state.att, sideMargin);
+                drawSection('vzw', state.vzw, sideMargin);
+                yPosition = contentStartY; // Reset Y for the second column
+                drawSection('tmo', state.tmo, 110);
+            } else {
+                carriersWithData.forEach(carrier => {
+                    const sectionHeight = calculateSectionHeight(state[carrier].consolidatedList);
+                    if (yPosition + sectionHeight > (pageHeight - bottomMargin)) {
+                        doc.addPage();
+                        yPosition = topMargin;
+                        // Re-draw header on new page if needed
+                        doc.setFont("helvetica", "normal").setFontSize(8).text(timestamp, sideMargin, yPosition);
                         yPosition += lineHeight;
-                    });
-                    yPosition += sectionSpacing;
-                }
+                        if (comments) { const splitComments = doc.splitTextToSize(comments, 190); doc.text(splitComments, sideMargin, yPosition); yPosition += (splitComments.length * lineHeight); }
+                        yPosition += sectionSpacing;
+                    }
+                    drawSection(carrier, state[carrier], sideMargin);
+                });
             }
 
-            if (yPosition === margin) {
-                doc.setFont("helvetica", "normal").setFontSize(12);
-                doc.text("No inventory found.", margin, margin);
+            if (carriersWithData.length === 0) {
+                doc.setFont("helvetica", "normal").setFontSize(12).text("No inventory found.", sideMargin, yPosition);
             }
             return doc.output('datauristring');
         };
 
-        // --- EVENT HANDLERS & MODAL LOGIC ---
-
-        const handleFileSelect = async (event) => {
-            const file = event.target.files[0];
-            const carrier = event.target.dataset.carrier;
-            if (!file || !carrier) return;
-
-            const emphasizeBtn = document.getElementById(`${carrier}-emphasize-btn`);
-            emphasizeBtn.disabled = true;
-            
-            try {
-                const text = await getTextFromPdf(file);
-                const parsedList = parseInventoryText(text);
-                appState[carrier].consolidatedList = consolidateInventory(parsedList);
-                appState[carrier].emphasis.clear();
-                emphasizeBtn.disabled = false;
-            } catch (error) {
-                alert(`Failed to process ${carrier.toUpperCase()} PDF.`);
-                console.error(error);
-            }
-        };
-        
-        const openEmphasisModal = (carrier) => {
-            emphasisModalTitle.textContent = `Emphasize ${carrier.toUpperCase()} Inventory`;
-            emphasisListContainer.innerHTML = '';
-
-            const data = appState[carrier];
-            data.consolidatedList.forEach(item => {
-                const [model, capacity, details] = item;
-                const itemKey = `${model}|${capacity}`;
-                const currentEmphasis = data.emphasis.get(itemKey) || { box: false, bold: false };
-
-                const itemDiv = document.createElement('div');
-                itemDiv.className = 'emphasis-item';
-
-                const boxCheckbox = document.createElement('input');
-                boxCheckbox.type = 'checkbox';
-                boxCheckbox.checked = currentEmphasis.box;
-                boxCheckbox.addEventListener('change', (e) => {
-                    const state = data.emphasis.get(itemKey) || { box: false, bold: false };
-                    state.box = e.target.checked;
-                    data.emphasis.set(itemKey, state);
-                });
-
-                const boldCheckbox = document.createElement('input');
-                boldCheckbox.type = 'checkbox';
-                boldCheckbox.checked = currentEmphasis.bold;
-                boldCheckbox.addEventListener('change', (e) => {
-                    const state = data.emphasis.get(itemKey) || { box: false, bold: false };
-                    state.bold = e.target.checked;
-                    data.emphasis.set(itemKey, state);
-                });
-
-                const textDiv = document.createElement('div');
-                textDiv.className = 'emphasis-item-text';
-                textDiv.textContent = `${model} ${capacity} - ${details}`;
-
-                itemDiv.appendChild(boxCheckbox);
-                itemDiv.appendChild(boldCheckbox);
-                itemDiv.appendChild(textDiv);
-                emphasisListContainer.appendChild(itemDiv);
-            });
-            
-            emphasisModal.style.display = 'flex';
-        };
-
-        const hideEmphasisModal = () => emphasisModal.style.display = 'none';
-        const showPreviewModal = (pdfDataUri) => {
-            iframe.src = pdfDataUri;
-            previewModal.style.display = 'flex';
-        };
-        const hidePreviewModal = () => {
-            iframe.src = '';
-            previewModal.style.display = 'none';
-        };
-
-        // --- ATTACH EVENT LISTENERS ---
-
-        fileInputs.forEach(input => input.addEventListener('change', handleFileSelect));
-        emphasizeBtns.forEach(btn => btn.addEventListener('click', (e) => openEmphasisModal(e.target.dataset.carrier)));
-        
-        processBtn.addEventListener('click', () => {
-            const pdfDataUri = generateFinalPdf(appState);
-            showPreviewModal(pdfDataUri);
-        });
-
-        previewCloseBtn.addEventListener('click', hidePreviewModal);
-        emphasisCloseBtn.addEventListener('click', hideEmphasisModal);
-        emphasisDoneBtn.addEventListener('click', hideEmphasisModal);
-        window.addEventListener('click', (event) => {
-            if (event.target == previewModal) hidePreviewModal();
-            if (event.target == emphasisModal) hideEmphasisModal();
-        });
-
-        downloadBtn.addEventListener('click', () => {
-            const link = document.createElement('a');
-            link.href = iframe.src;
-            link.download = 'Combined_Inventory.pdf';
-            link.click();
-        });
-        printBtn.addEventListener('click', () => iframe.contentWindow.print());
+        // --- DYNAMIC UI & EVENT HANDLERS ---
+        document.getElementById('preview-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h2>PDF Preview</h2><span class="close-btn" id="preview-close-btn">&times;</span></div><div class="modal-body"><iframe id="pdf-preview-iframe" frameborder="0"></iframe></div><div class="modal-footer"><button id="print-btn">Print</button><button id="download-btn">Download</button></div></div>`;
+        document.getElementById('emphasis-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h2 id="emphasis-modal-title">Emphasize Inventory</h2><span class="close-btn" id="emphasis-close-btn">&times;</span></div><div class="modal-body"><div class="emphasis-header"><div class="emphasis-header-bold">Bold</div><div class="emphasis-header-box">Box</div><div class="emphasis-header-text">Item</div></div><div id="emphasis-list-container"></div></div><div class="modal-footer"><button id="emphasis-done-btn">Done</button></div></div>`;
+        const previewModal = document.getElementById('preview-modal'), emphasisModal = document.getElementById('emphasis-modal'), iframe = document.getElementById('pdf-preview-iframe');
+        const handleFileSelect = async (file, carrier) => { if (!file || !carrier) return; const emphasizeBtn = document.getElementById(`${carrier}-emphasize-btn`); emphasizeBtn.disabled = true; try { const text = await getTextFromPdf(file); const parsedList = parseInventoryText(text); appState[carrier].consolidatedList = consolidateInventory(parsedList); appState[carrier].emphasis.clear(); emphasizeBtn.disabled = false; } catch (error) { alert(`Failed to process ${carrier.toUpperCase()} PDF.`); console.error(error); } };
+        const openEmphasisModal = (carrier) => { document.getElementById('emphasis-modal-title').textContent = `Emphasize ${carrier.toUpperCase()} Inventory`; const listContainer = document.getElementById('emphasis-list-container'); listContainer.innerHTML = ''; const data = appState[carrier]; data.consolidatedList.forEach(item => { const [modelAndCapacity, details] = item; const itemKey = modelAndCapacity; const currentEmphasis = data.emphasis.get(itemKey) || { box: false, bold: false }; const itemDiv = document.createElement('div'); itemDiv.className = 'emphasis-item'; const boldCheckbox = document.createElement('input'); boldCheckbox.type = 'checkbox'; boldCheckbox.checked = currentEmphasis.bold; boldCheckbox.addEventListener('change', (e) => { const state = data.emphasis.get(itemKey) || { box: false, bold: false }; state.bold = e.target.checked; data.emphasis.set(itemKey, state); }); const boxCheckbox = document.createElement('input'); boxCheckbox.type = 'checkbox'; boxCheckbox.checked = currentEmphasis.box; boxCheckbox.addEventListener('change', (e) => { const state = data.emphasis.get(itemKey) || { box: false, bold: false }; state.box = e.target.checked; data.emphasis.set(itemKey, state); }); const textDiv = document.createElement('div'); textDiv.className = 'emphasis-item-text'; textDiv.textContent = `${modelAndCapacity} - ${details}`; itemDiv.appendChild(boldCheckbox); itemDiv.appendChild(boxCheckbox); itemDiv.appendChild(textDiv); listContainer.appendChild(itemDiv); }); emphasisModal.style.display = 'flex'; };
+        document.querySelectorAll('input[type="file"]').forEach(input => input.addEventListener('change', (e) => handleFileSelect(e.target.files[0], e.target.dataset.carrier)));
+        document.querySelectorAll('.emphasize-btn').forEach(btn => btn.addEventListener('click', (e) => openEmphasisModal(e.target.dataset.carrier)));
+        document.getElementById('process-btn').addEventListener('click', () => { debugOutput.textContent = ''; if(document.getElementById('debug-toggle').checked) {debugConsole.style.display = 'block';} const comments = commentsInput.value; const pdfDataUri = generateFinalPdf(appState, comments); iframe.src = pdfDataUri; previewModal.style.display = 'flex'; });
+        document.querySelectorAll('.input-wrapper').forEach(zone => { zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('dragover'); }); zone.addEventListener('dragleave', (e) => { e.preventDefault(); zone.classList.remove('dragover'); }); zone.addEventListener('drop', (e) => { e.preventDefault(); zone.classList.remove('dragover'); const fileInput = zone.querySelector('input[type="file"]'); const file = e.dataTransfer.files[0]; if (file && file.type === "application/pdf") { fileInput.files = e.dataTransfer.files; handleFileSelect(file, fileInput.dataset.carrier); } }); });
+        document.getElementById('preview-close-btn').addEventListener('click', () => previewModal.style.display = 'none');
+        document.getElementById('emphasis-close-btn').addEventListener('click', () => emphasisModal.style.display = 'none');
+        document.getElementById('emphasis-done-btn').addEventListener('click', () => emphasisModal.style.display = 'none');
+        window.addEventListener('click', (event) => { if (event.target == previewModal) previewModal.style.display = 'none'; if (event.target == emphasisModal) emphasisModal.style.display = 'none'; });
+        document.getElementById('download-btn').addEventListener('click', () => { const link = document.createElement('a'); link.href = iframe.src; link.download = 'Combined_Inventory.pdf'; link.click(); });
+        document.getElementById('print-btn').addEventListener('click', () => { if (iframe.src) { window.open(iframe.src); } });
+        document.getElementById('debug-toggle').addEventListener('change', (e) => { debugConsole.style.display = e.target.checked ? 'block' : 'none'; });
 
     </script>
 
