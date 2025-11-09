@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>spamfan's better inventory v14</title>
+    <title>spamfan's better inventory v15</title>
     
     <!-- PDF.js and jsPDF library CDNs -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
@@ -229,7 +229,7 @@
     <script>
     document.addEventListener('DOMContentLoaded', () => {
         // --- SCRIPT INITIALIZATION ---
-        document.getElementById('version-span').textContent = '(Alpha v14)';
+        document.getElementById('version-span').textContent = '(Alpha v15)';
         pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js`;
 
         // --- GLOBAL STATE ---
@@ -238,6 +238,7 @@
             vzw: { consolidatedList: [], emphasis: new Map() },
             tmo: { consolidatedList: [], emphasis: new Map() }
         };
+        let devModalCloseable = { button: true, backdrop: true };
 
         // --- STATIC UI ELEMENT SELECTORS ---
         const versionSpan = document.getElementById('version-span');
@@ -268,7 +269,7 @@
 
         // --- CORE LOGIC FUNCTIONS ---
         const getTextFromPdf = (file) => { /* identical to v12 */ return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = async (event) => { try { const pdf = await pdfjsLib.getDocument({ data: event.target.result }).promise; let textContent = ''; for (let i = 1; i <= pdf.numPages; i++) { const page = await pdf.getPage(i); const text = await page.getTextContent(); textContent += text.items.map(s => s.str).join(' '); } resolve(textContent); } catch (error) { reject(error); } }; reader.onerror = (error) => reject(error); reader.readAsArrayBuffer(file); }); };
-        const parseInventoryText = (text) => { /* identical to v12 */ if (!text) return []; const dataStartIndex = text.indexOf('Quantity'); if (dataStartIndex === -1) return []; const dataText = text.substring(dataStartIndex + 'Quantity'.length); const inventoryRegex = /(.+?)\s+(\d+\s?GB)\s+([a-zA-Z\s]+?)\s+(\d+\s+available)/g; const matches = [...dataText.matchAll(inventoryRegex)]; const inventory = []; const unlockedRegex = /unlock\s?ed/i; for (const match of matches) { if (!unlockedRegex.test(match[0])) { const model = match[1].trim(); const capacity = match[2].trim(); const modelAndCapacity = `${model} ${capacity}`; const color = match[3].trim(); const quantity = match[4].match(/\d+/)[0]; inventory.push([modelAndCapacity, color, quantity]); } } return inventory; };
+        const parseInventoryText = (text) => { /* MODIFIED for v15 */ if (!text) return []; const dataStartIndex = text.indexOf('Quantity'); if (dataStartIndex === -1) return []; const dataText = text.substring(dataStartIndex + 'Quantity'.length); const inventoryRegex = /(.+?)\s+(\d+\s?GB)\s+([a-zA-Z\s]+?)\s+(\d+\s+available)/g; const matches = [...dataText.matchAll(inventoryRegex)]; const inventory = []; const unlockedRegex = /un\s?-?\s?lock\s?-?\s?ed/i; for (const match of matches) { if (!unlockedRegex.test(match[0])) { const model = match[1].trim(); const capacity = match[2].trim(); const modelAndCapacity = `${model} ${capacity}`; const color = match[3].trim(); const quantity = match[4].match(/\d+/)[0]; inventory.push([modelAndCapacity, color, quantity]); } } return inventory; };
         const abbreviateColor = (color) => { /* identical to v12 */ const c = color.toLowerCase(); if (c.includes('titanium') && c.includes('black')) return 'Black'; if (c.includes('space black')) return 'Black'; if (c.includes('sky blue') || c.includes('deep blue') || c.includes('ultramarine')) return 'Blue'; if (c.includes('titanium')) return c.split(' ')[0].charAt(0).toUpperCase() + c.split(' ')[0].slice(1); if (c.includes('orange')) return 'Orange'; return color.split(' ')[0].charAt(0).toUpperCase() + color.split(' ')[0].slice(1); };
         const consolidateInventory = (inventoryList) => { /* identical to v12 */ const consolidationMap = new Map(); for (const [modelAndCapacity, color, quantity] of inventoryList) { const key = modelAndCapacity; if (!consolidationMap.has(key)) { consolidationMap.set(key, { modelAndCapacity, details: [] }); } const abbreviated = abbreviateColor(color); consolidationMap.get(key).details.push({ color: abbreviated, quantity }); } const consolidatedList = []; for (const value of consolidationMap.values()) { const detailsString = value.details.map(d => `${d.quantity} ${d.color}`).join(', '); consolidatedList.push([value.modelAndCapacity, detailsString]); } return consolidatedList; };
         const categorizePdf = (text) => { /* identical to v12 */ const lowerCaseText = text.toLowerCase(); if (lowerCaseText.includes('at&t')) return 'att'; if (lowerCaseText.includes('verizon') || lowerCaseText.includes('vzw')) return 'vzw'; if (lowerCaseText.includes('t-mobile') || lowerCaseText.includes('tmo')) return 'tmo'; return 'unknown'; };
@@ -291,15 +292,87 @@
         previewCloseBtn.addEventListener('click', () => previewModal.style.display = 'none');
         emphasisCloseBtn.addEventListener('click', () => emphasisModal.style.display = 'none');
         emphasisDoneBtn.addEventListener('click', () => emphasisModal.style.display = 'none');
-        devModeCloseBtn.addEventListener('click', () => devModeModal.style.display = 'none');
-        window.addEventListener('click', (event) => { if (event.target == previewModal) previewModal.style.display = 'none'; if (event.target == emphasisModal) emphasisModal.style.display = 'none'; if (event.target == devModeModal) devModeModal.style.display = 'none'; });
+        devModeCloseBtn.addEventListener('click', () => { if (devModalCloseable.button) devModeModal.style.display = 'none'; });
+        window.addEventListener('click', (event) => { 
+            if (event.target == previewModal) previewModal.style.display = 'none'; 
+            if (event.target == emphasisModal) emphasisModal.style.display = 'none'; 
+            if (event.target == devModeModal && devModalCloseable.backdrop) devModeModal.style.display = 'none'; 
+        });
         downloadBtn.addEventListener('click', () => { const link = document.createElement('a'); link.href = iframe.src; link.download = 'Combined_Inventory.pdf'; link.click(); });
         printBtn.addEventListener('click', () => { if (iframe.src) { window.open(iframe.src); } });
         
-        emphasisModal.addEventListener('change', (e) => { /* MODIFIED for v14 - Bug Fix */ const target = e.target; if (target.type === 'checkbox' && target.dataset.key) { const { key, carrier, type } = target.dataset; const state = appState[carrier].emphasis.get(key) || { partial: false, full: false }; state[type] = target.checked; const parentItem = target.closest('.emphasis-item'); if (parentItem) { const partialBox = parentItem.querySelector('[data-type="partial"]'); const fullBox = parentItem.querySelector('[data-type="full"]'); if (type === 'full' && target.checked) { state.partial = true; if (partialBox) partialBox.checked = true; } if (type === 'partial' && !target.checked) { state.full = false; if (fullBox) fullBox.checked = false; } } appState[carrier].emphasis.set(key, state); } });
+        emphasisModal.addEventListener('change', (e) => { /* MODIFIED for v15 */ 
+            const target = e.target;
+            if (target.type !== 'checkbox') return;
+            
+            const isMaster = target.id.startsWith('master-');
+
+            if (isMaster) {
+                const type = target.id.includes('partial') ? 'partial' : 'full';
+                const isChecking = target.checked;
+                const allItems = emphasisModal.querySelectorAll('.emphasis-item');
+
+                allItems.forEach(item => {
+                    const partialBox = item.querySelector('[data-type="partial"]');
+                    const fullBox = item.querySelector('[data-type="full"]');
+                    const key = partialBox.dataset.key;
+                    const carrier = partialBox.dataset.carrier;
+                    const state = appState[carrier].emphasis.get(key) || { partial: false, full: false };
+
+                    if (type === 'partial') {
+                        partialBox.checked = isChecking;
+                        state.partial = isChecking;
+                        if (!isChecking) {
+                            fullBox.checked = false;
+                            state.full = false;
+                        }
+                    } else { // type === 'full'
+                        fullBox.checked = isChecking;
+                        state.full = isChecking;
+                        if (isChecking) {
+                            partialBox.checked = true;
+                            state.partial = true;
+                        }
+                    }
+                    appState[carrier].emphasis.set(key, state);
+                });
+
+            } else if (target.dataset.key) {
+                const { key, carrier, type } = target.dataset;
+                const state = appState[carrier].emphasis.get(key) || { partial: false, full: false };
+                state[type] = target.checked;
+                const parentItem = target.closest('.emphasis-item');
+                if (parentItem) {
+                    const partialBox = parentItem.querySelector('[data-type="partial"]');
+                    const fullBox = parentItem.querySelector('[data-type="full"]');
+                    if (type === 'full' && target.checked) {
+                        state.partial = true;
+                        if (partialBox) partialBox.checked = true;
+                    }
+                    if (type === 'partial' && !target.checked) {
+                        state.full = false;
+                        if (fullBox) fullBox.checked = false;
+                    }
+                }
+                appState[carrier].emphasis.set(key, state);
+            }
+        });
         
         let clickCount = 0, lastClick = 0;
-        versionSpan.addEventListener('click', () => { const now = Date.now(); if (now - lastClick > 500) { clickCount = 0; } lastClick = now; clickCount++; if (clickCount === 7) { devModeModal.style.display = 'flex'; clickCount = 0; } });
+        versionSpan.addEventListener('click', () => {
+            const now = Date.now();
+            if (now - lastClick > 500) { clickCount = 0; }
+            lastClick = now;
+            clickCount++;
+            if (clickCount === 7) {
+                devModalCloseable.button = false;
+                devModalCloseable.backdrop = false;
+                devModeModal.style.display = 'flex';
+                setTimeout(() => { devModalCloseable.button = true; }, 500);
+                setTimeout(() => { devModalCloseable.backdrop = true; }, 1000);
+                clickCount = 0;
+            }
+        });
         commentsInput.addEventListener('input', (e) => { const konami = "upupdowndownleftrightleftrightba"; const input = e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''); konamiMessage.style.display = input.includes(konami) ? 'block' : 'none'; });
     });
     </script>
