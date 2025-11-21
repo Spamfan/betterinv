@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spamfan's inventory optimizer (alpha v21)</title>
+    <title>Spamfan's inventory optimizer (alpha v25)</title>
     
     <!-- PDF.js and jsPDF library CDNs -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
@@ -82,9 +82,11 @@
             justify-content: center;
             margin-bottom: 20px;
             gap: 20px;
+            flex-wrap: wrap;
         }
         .toggle-option { display: flex; align-items: center; }
         .toggle-option label { margin: 0 0 0 8px; font-weight: normal; }
+        #edlp-toggle-wrapper { display: none; }
 
         .action-buttons {
             display: flex;
@@ -205,7 +207,11 @@
             </div>
             <div class="toggle-option">
                 <input type="checkbox" id="dev-console-toggle">
-                <label for="dev-console-toggle">Use Developer Settings</label>
+                <label for="dev-console-toggle">Experimental Settings</label>
+            </div>
+            <div class="toggle-option" id="edlp-toggle-wrapper">
+                <input type="checkbox" id="show-edlps-toggle">
+                <label for="show-edlps-toggle">Show EDLPs (10/17/25)</label>
             </div>
         </div>
         
@@ -236,7 +242,7 @@
     <script>
     document.addEventListener('DOMContentLoaded', () => {
         // --- SCRIPT INITIALIZATION ---
-        const APP_VERSION = '(Alpha v21)';
+        const APP_VERSION = '(Alpha v25)';
         document.getElementById('version-span').textContent = APP_VERSION;
         pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js`;
         const HIDE_ICON_SVG = `<svg class="hide-icon inline-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M11.83,9.53c1.53,0.24,2.74,1.46,2.98,2.98L11.83,9.53z M12,6c3.79,0,7.17,2.13,8.82,5.5c-0.64,1.32-1.57,2.44-2.68,3.32l1.42,1.42c1.51-1.26,2.7-2.89,3.43-4.74C21.27,7.11,17,4,12,4c-1.4,0-2.73,0.25-3.98,0.7L9.63,6.3C10.4,6.12,11.19,6,12,6z M2,4.27l3.11,3.11C3.26,8.9,2.42,10.36,2.03,11.5C3.73,15.89,7.5,18,12,18c1.55,0,3.03-0.3,4.38-0.84l2.1,2.1L20,18.73L3.27,2L2,4.27z M7.53,9.8l1.55,1.55C9.03,11.49,9,11.74,9,12c0,1.66,1.34,3,3,3c0.26,0,0.51-0.03,0.75-0.08l1.55,1.55C13.96,15.86,13,16,12,16c-2.76,0-5-2.24-5-5C7,10.54,7.14,9.96,7.53,9.8z"/></svg>`;
@@ -248,15 +254,15 @@
                 <li><strong>Save Each Carrier's Inventory as a PDF</strong>
                     <ul>
                         <li>CRITICAL: You must open WARP in a new, separate window (Ctrl + N). The optimizer will not accept file inputs if WARP is only in a separate tab.</li>
-                        <li>In the new WARP window, navigate to: Manage Inventory > View current inventory.</li>
-                        <li>Select AT&T > check the box that says "In Stock," then click the More Options (${MORE_OPTIONS_SVG}) menu, and choose Print.</li>
-                        <li>Change the "Destination" printer from "CKPR1" to "Save as PDF."
+                        <li>In the new WARP window, navigate to: Manage Inventory > Inventory Reports.</li>
+                        <li>Select AT&T, click the More Options (${MORE_OPTIONS_SVG}) menu, and choose Print.</li>
+                        <li>Change the "Destination" printer from "CPR1" to Save as PDF.
                             <ul><li>Note: For best results, use the original formatting (100% scale and default margins), as this has passed user testing.</li></ul>
                         </li>
-                        <li>Name the file exactly "ATT.pdf". If a file with that name already exists, you overwrite it.</li>
+                        <li>Name the file exactly "ATT.pdf". If a file with that name already exists, you must overwrite it.</li>
                         <li>Repeat this exact process for Verizon, naming the file "VZW.pdf".</li>
                         <li>Repeat one last time for T-Mobile, naming the file "TMO.pdf".</li>
-                        <li>To get the File Explorer ready for the next step, start to save the "TMO.pdf" file a second time, following steps all the way past the part where you label it as "TMO.pdf," but this time don't actually finish saving it. Just leave the File Explorer window open.</li>
+                        <li>To get the File Explorer ready for the next step, start to save the "TMO.pdf" file a second time, but don't actually save it. Just leave the File Explorer window open.</li>
                     </ul>
                 </li>
                 <li><strong>Drag and Drop Files into the Optimizer</strong>
@@ -280,19 +286,97 @@
                     <ul>
                         <li>Click the blue "Preview or Print" button.</li>
                         <li>A preview pane showing the combined PDF will appear. Right-click anywhere on the PDF preview and choose Print.</li>
-                        <li>Important: Be sure to re-select your store's printer (e.g., "CKPR1") as the destination so you print the combined file instead of saving it as a PDF again.</li>
+                        <li>Important: Be sure to re-select your store's printer (e.g., "CPR1") as the destination so you print the combined file instead of saving it as a PDF again.</li>
                     </ul>
                 </li>
             </ol>
         `;
 
         // --- GLOBAL STATE ---
-        let appState = { att: { consolidatedList: [], emphasis: new Map() }, vzw: { consolidatedList: [], emphasis: new Map() }, tmo: { consolidatedList: [], emphasis: new Map() } };
+        let appState = { 
+            att: { consolidatedList: [], emphasis: new Map(), fileDate: '' }, 
+            vzw: { consolidatedList: [], emphasis: new Map(), fileDate: '' }, 
+            tmo: { consolidatedList: [], emphasis: new Map(), fileDate: '' } 
+        };
         let devModalCloseable = { button: true, backdrop: true };
 
+        // --- EDLP DATA & ABBREVIATIONS ---
+        const DEVICE_ABBREVIATIONS = {
+            'Classic': 'Classic', 'Galaxy A03': 'A03', 'Galaxy A13 LTE': 'A13', 'Galaxy A15 5G': 'A15', 'Galaxy A16 5G': 'A16', 'Galaxy A35 5G': 'A35', 'Galaxy S24 FE': '24FE', 'Galaxy S25 FE': '25FE', 'Galaxy S25 Plus 5G': '25+', 'Galaxy S25 Ultra 5G': 'S25U', 'Galaxy Z Flip 4 5G': 'GZF4',
+            'iPhone 15': 'IP15', 'iPhone 16': 'IP16', 'iPhone 16 Plus': '16+', 'iPhone 16 Pro': '16PR', 'iPhone 16 Pro Max': '16PM', 'iPhone 16e': '16e', 'iPhone 17': 'IP17', 'iPhone 17 Pro': '17PR', 'iPhone 17 Pro Max': '17PM', 'iPhone Air': 'AIR',
+            'Moto G 5G 2024': 'MG24', 'Moto G 5G 2025': 'MG25', 'Moto G Power 2024': 'PWR24', 'Moto G Power 2025': 'PWR25', 'Moto G Stylus 2024': 'STY24', 'Moto G Stylus 2025': 'GS25', 'One Ace 5G': 'ACE', 'REVVL 6': 'REV6', 'TCL Flip 3': 'Flip3'
+        };
+
+        const COLOR_ABBREVIATIONS = {
+            'Beige': 'BGE', 'Black': 'BLK', 'Black Titanium': 'BLK', 'Blue': 'BLU', 'Cosmic Orange': 'ORNG', 'Desert Titanium': 'DSRT', 'Graphite': 'BLK', 'Gray': 'GRY', 'Green': 'GRN', 'Natural Titanium': 'NTRL', 'Navy': 'BLU', 'Sky Blue': 'BLU', 'Space Black': 'BLK', 'Titanium Black': 'BLK', 'Ultramarine': 'BLU', 'White': 'WHTE'
+        };
+
+        const EDLP_DATA = {
+            tmo: {
+                'Flip 4 5G': { dp: 20, mo: 1, total: 44 },
+                'Flip 5G': { dp: 20, mo: 1, total: 44 },
+                'Galaxy A13 LTE': { total: 49 },
+                'iPhone 15': { dp: 379, mo: 5, total: 499 },
+                'iPhone 16': { total: 629 },
+                'iPhone 16 Plus': { dp: 549, mo: 7.54, total: 730 },
+                'iPhone 16 Pro': { dp: 601 },
+                'iPhone 16e': { total: 549 },
+                'iPhone 17': { total: 730 },
+                'iPhone 17 Pro': { total: 799 },
+                'iPhone Air': { total: 899 },
+                'Moto G 5G 2025': { dp: 30, mo: 1, total: 54 },
+                'Moto G Stylus 2025': { dp: 50, mo: 3.50, total: 134 },
+                'REVVL 6': { dp: 30, mo: 0.25, total: 36 }
+            },
+            vzw: {
+                'Galaxy A03': { total: 36 }, 'Galaxy A16 5G': { total: 120 }, 'Galaxy S24 FE': { total: 650 }, 'Galaxy S25 FE': { total: 651 }, 'Galaxy S25 Plus 5G': { total: 799 }, 'Galaxy Z Flip 4 5G': { total: 650 },
+                'iPhone 15': { total: 499 }, 'iPhone 16 Plus': { total: 730 }, 'iPhone 16 Pro': { total: 799 }, 'iPhone 16 Pro Max': { total: 1100 }, 'iPhone 16e': { total: 550 },
+                'iPhone 17': { total: 729 }, 'iPhone 17 Pro': { total: 999 }, 'iPhone 17 Pro Max': { total: 1149 }, 'iPhone Air': { total: 899 },
+                'Moto G 5G 2024': { total: 72 }, 'Moto G 5G 2025': { total: 72 }, 'Moto G Power 2025': { total: 108 }, 'One Ace 5G': { total: 101 }, 'TCL Flip 3': { total: 36 }
+            },
+            att: {
+                'Classic': { total: 56 }, 'Galaxy A11': { total: 36 }, 'Galaxy A15 5G': { total: 36 }, 'Galaxy A16 5G': { total: 119 }, 'Galaxy A35 5G': { total: 99 },
+                'Galaxy S24 FE': { total: 612 }, 'Galaxy S25 FE': { total: 612 }, 'Galaxy S25 Plus 5G': { total: 799 }, 'Galaxy S25 Ultra 5G': { total: 1149 },
+                'iPhone 15': { total: 499 }, 'iPhone 16 Plus': { total: 730 }, 'iPhone 16 Pro': { total: 800 }, 'iPhone 16e': { total: 550 },
+                'iPhone 17': { total: 729 }, 'iPhone 17 Pro': { total: 1199 }, 'iPhone Air': { total: 899 }, 'Moto G Stylus 2025': { total: 180 }
+            }
+        };
+
         // --- LOCALSTORAGE FUNCTIONS ---
-        const saveSettings = () => { /* identical to v20 */ try { const cleanEmphasis = (emphasisMap) => { const cleanEntries = Array.from(emphasisMap.entries()).map(([key, value]) => { const { partial, full } = value; return [key, { partial, full }]; }); return new Map(cleanEntries); }; const settings = { isolate: isolateIphonesCheckbox.checked, emphasis: { att: Array.from(cleanEmphasis(appState.att.emphasis).entries()), vzw: Array.from(cleanEmphasis(appState.vzw.emphasis).entries()), tmo: Array.from(cleanEmphasis(appState.tmo.emphasis).entries()) } }; localStorage.setItem('betterInvSettings', JSON.stringify(settings)); } catch (error) { console.error("Could not save settings:", error); } };
-        const loadSettings = () => { /* identical to v18 */ try { const savedSettings = localStorage.getItem('betterInvSettings'); if (savedSettings) { const settings = JSON.parse(savedSettings); isolateIphonesCheckbox.checked = settings.isolate || false; appState.att.emphasis = new Map(settings.emphasis.att || []); appState.vzw.emphasis = new Map(settings.emphasis.vzw || []); appState.tmo.emphasis = new Map(settings.emphasis.tmo || []); } } catch (error) { console.error("Could not load settings, using defaults:", error); } };
+        const saveSettings = () => {
+            try {
+                const cleanEmphasis = (emphasisMap) => {
+                    const cleanEntries = Array.from(emphasisMap.entries()).map(([key, value]) => {
+                        const { partial, full } = value; 
+                        return [key, { partial, full }];
+                    });
+                    return new Map(cleanEntries);
+                };
+
+                const settings = {
+                    isolate: isolateIphonesCheckbox.checked,
+                    emphasis: {
+                        att: Array.from(cleanEmphasis(appState.att.emphasis).entries()),
+                        vzw: Array.from(cleanEmphasis(appState.vzw.emphasis).entries()),
+                        tmo: Array.from(cleanEmphasis(appState.tmo.emphasis).entries())
+                    }
+                };
+                localStorage.setItem('betterInvSettings', JSON.stringify(settings));
+            } catch (error) { console.error("Could not save settings:", error); }
+        };
+
+        const loadSettings = () => {
+            try {
+                const savedSettings = localStorage.getItem('betterInvSettings');
+                if (savedSettings) {
+                    const settings = JSON.parse(savedSettings);
+                    isolateIphonesCheckbox.checked = settings.isolate || false;
+                    appState.att.emphasis = new Map(settings.emphasis.att || []);
+                    appState.vzw.emphasis = new Map(settings.emphasis.vzw || []);
+                    appState.tmo.emphasis = new Map(settings.emphasis.tmo || []);
+                }
+            } catch (error) { console.error("Could not load settings, using defaults:", error); }
+        };
 
         // --- STATIC UI ELEMENT SELECTORS ---
         const versionSpan = document.getElementById('version-span');
@@ -307,13 +391,30 @@
         const devConsoleContainer = document.getElementById('dev-console-container');
         const devConsoleOutput = document.getElementById('dev-console-output');
         const copyLogBtn = document.getElementById('copy-log-btn');
+        const edlpToggleWrapper = document.getElementById('edlp-toggle-wrapper');
+        const showEdlpsToggle = document.getElementById('show-edlps-toggle');
 
         // --- DYNAMIC HTML INJECTION ---
-        document.getElementById('preview-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h2>PDF Preview</h2><span class="close-btn" id="preview-close-btn">&times;</span></div><div class="modal-body"><iframe id="pdf-preview-iframe" frameborder="0"></iframe></div><div class="modal-footer"><button id="download-btn">Download</button></div></div>`;
+        document.getElementById('preview-modal').innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header"><h2>PDF Preview</h2><span class="close-btn" id="preview-close-btn">&times;</span></div>
+                <div class="modal-body">
+                    <div style="text-align: left; margin-bottom: 10px; color: #333;">
+                        <strong>To print:</strong>
+                        <ul style="margin: 5px 0 10px 20px; padding: 0;">
+                            <li><strong>Right click preview pane</strong></li>
+                            <li><strong>Click print</strong></li>
+                            <li>Remember to change the destination printer back to CKPR1.</li>
+                        </ul>
+                    </div>
+                    <iframe id="pdf-preview-iframe" frameborder="0"></iframe>
+                </div>
+                <div class="modal-footer"><button id="download-btn">Download</button></div>
+            </div>`;
         document.getElementById('emphasis-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h2 id="emphasis-modal-title">Highlight Inventory</h2><span class="close-btn" id="emphasis-close-btn">&times;</span></div><div class="modal-body"><div class="emphasis-header"><div class="emphasis-header-hide"></div><div class="emphasis-header-partial"><input type="checkbox" id="master-partial-checkbox" title="Select/Deselect All Partial"></div><div class="emphasis-header-full"><input type="checkbox" id="master-full-checkbox" title="Select/Deselect All Full"></div><div class="emphasis-header-text">(Highlight partial/full)</div></div><div id="emphasis-list-container"></div></div><div class="modal-footer"><button id="emphasis-done-btn">Done</button></div></div>`;
         document.getElementById('dev-mode-modal').innerHTML = `<div class="modal-content"><div class="modal-header"><h2>Dev Mode</h2><span class="close-btn" id="dev-mode-close-btn">&times;</span></div><div class="modal-body"><div id="dev-mode-text"><p><strong>developer mode activated lol</strong></p><p>(this doesn't do anything)</p></div></div></div>`;
         
-        // --- DYNAMIC UI ELEMENT SELECTORS (must be after injection) ---
+        // --- DYNAMIC UI ELEMENT SELECTORS ---
         const previewModal = document.getElementById('preview-modal');
         const emphasisModal = document.getElementById('emphasis-modal');
         const devModeModal = document.getElementById('dev-mode-modal');
@@ -324,18 +425,313 @@
         const devModeCloseBtn = document.getElementById('dev-mode-close-btn');
         const downloadBtn = document.getElementById('download-btn');
 
-        // --- CORE LOGIC FUNCTIONS ---
-        const getTextFromPdf = (file) => { /* identical to v12 */ return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = async (event) => { try { const pdf = await pdfjsLib.getDocument({ data: event.target.result }).promise; let textContent = ''; for (let i = 1; i <= pdf.numPages; i++) { const page = await pdf.getPage(i); const text = await page.getTextContent(); textContent += text.items.map(s => s.str).join(' '); } resolve(textContent); } catch (error) { reject(error); } }; reader.onerror = (error) => reject(error); reader.readAsArrayBuffer(file); }); };
-        const parseInventoryText = (text) => { /* identical to v19 */ if (!text) return { preFilterList: [], postFilterList: [] }; const dataStartIndex = text.indexOf('Quantity'); if (dataStartIndex === -1) return { preFilterList: [], postFilterList: [] }; const dataText = text.substring(dataStartIndex + 'Quantity'.length); const inventoryRegex = /(.+?)\s+(\d+\s?GB)\s+([a-zA-Z\s]+?)\s+(\d+\s+available)/g; const matches = [...dataText.matchAll(inventoryRegex)]; const preFilterList = []; const postFilterList = []; const unlockedRegex = /un\s?-?\s?lock\s?-?\s?e\s?d/i; for (const match of matches) { const model = match[1].trim(); const capacity = match[2].trim(); const modelAndCapacity = `${model} ${capacity}`; const color = match[3].trim(); const quantity = match[4].match(/\d+/)[0]; const item = [modelAndCapacity, color, quantity]; preFilterList.push(item); if (!unlockedRegex.test(match[0])) { postFilterList.push(item); } } return { preFilterList, postFilterList }; };
-        const abbreviateColor = (color) => { /* identical to v12 */ const c = color.toLowerCase(); if (c.includes('titanium') && c.includes('black')) return 'Black'; if (c.includes('space black')) return 'Black'; if (c.includes('sky blue') || c.includes('deep blue') || c.includes('ultramarine')) return 'Blue'; if (c.includes('titanium')) return c.split(' ')[0].charAt(0).toUpperCase() + c.split(' ')[0].slice(1); if (c.includes('orange')) return 'Orange'; return color.split(' ')[0].charAt(0).toUpperCase() + color.split(' ')[0].slice(1); };
-        const consolidateInventory = (inventoryList) => { /* identical to v12 */ const consolidationMap = new Map(); for (const [modelAndCapacity, color, quantity] of inventoryList) { const key = modelAndCapacity; if (!consolidationMap.has(key)) { consolidationMap.set(key, { modelAndCapacity, details: [] }); } const abbreviated = abbreviateColor(color); consolidationMap.get(key).details.push({ color: abbreviated, quantity }); } const consolidatedList = []; for (const value of consolidationMap.values()) { const detailsString = value.details.map(d => `${d.quantity} ${d.color}`).join(', '); consolidatedList.push([value.modelAndCapacity, detailsString]); } return consolidatedList; };
-        const categorizePdf = (text) => { /* identical to v12 */ const lowerCaseText = text.toLowerCase(); if (lowerCaseText.includes('at&t')) return 'att'; if (lowerCaseText.includes('verizon') || lowerCaseText.includes('vzw')) return 'vzw'; if (lowerCaseText.includes('t-mobile') || lowerCaseText.includes('tmo')) return 'tmo'; return 'unknown'; };
-        const prepareDataForDisplay = () => { /* identical to v20 */ const preparedState = { att: {}, vzw: {}, tmo: {} }; if (isolateIphonesCheckbox.checked) { const priorityOrder = ['att', 'vzw', 'tmo']; let iphoneSource = null; for (const carrier of priorityOrder) { if (appState[carrier].consolidatedList.some(item => item[0].toLowerCase().startsWith('iphone'))) { iphoneSource = carrier; break; } } preparedState.apple = { consolidatedList: [] }; for (const carrier of ['att', 'vzw', 'tmo']) { preparedState[carrier].consolidatedList = appState[carrier].consolidatedList.filter(item => !item[0].toLowerCase().startsWith('iphone')); if (carrier === iphoneSource) { const iphones = appState[carrier].consolidatedList.filter(item => item[0].toLowerCase().startsWith('iphone')).map(item => ({ modelAndCapacity: item[0], details: item[1], sourceCarrier: carrier })); preparedState.apple.consolidatedList = iphones; } } } else { preparedState.att.consolidatedList = appState.att.consolidatedList; preparedState.vzw.consolidatedList = appState.vzw.consolidatedList; preparedState.tmo.consolidatedList = appState.tmo.consolidatedList; } return preparedState; };
-        const generateFinalPdf = (state, comments) => { /* identical to v20 */ const { jsPDF } = window.jspdf; const doc = new jsPDF(); const topMargin = 12.7, sideMargin = 6.35, bottomMargin = 6.35; const pageHeight = 297, lineHeight = 4.5, sectionSpacing = 7; const headerHeight = 6, listTopMargin = 2; let yPosition = topMargin; const timestamp = new Date().toLocaleString(); const headerLines = [`${timestamp} - This inventory report was made using Spamfan's inventory optimizer ${APP_VERSION.slice(0, -1)}.)`, "This software is in development and can make mistakes."]; doc.setFont("helvetica", "normal").setFontSize(8).text(headerLines, sideMargin, yPosition); yPosition += (headerLines.length * lineHeight); if (comments) { const splitComments = doc.splitTextToSize(comments, 190); doc.setFont("helvetica", "italic").text(splitComments, sideMargin, yPosition); yPosition += (splitComments.length * (lineHeight - 1)); } yPosition += sectionSpacing; const contentStartY = yPosition; const calculateSectionHeight = (carrier, list) => { if (!list || list.length === 0) return 0; let visibleCount = 0; list.forEach(item => { const model = (carrier === 'apple') ? item.modelAndCapacity : item[0]; const source = (carrier === 'apple') ? item.sourceCarrier : carrier; const emphasis = appState[source].emphasis.get(model) || {}; if (!emphasis.hidden) { visibleCount++; } }); return headerHeight + listTopMargin + (visibleCount * lineHeight) + sectionSpacing; }; const carriersForLayout = Object.keys(state).filter(c => state[c].consolidatedList && state[c].consolidatedList.length > 0); const leftColumnCarriers = carriersForLayout.filter(c => c !== 'apple' && c !== 'tmo'); const rightColumnCarriers = carriersForLayout.filter(c => c === 'apple' || c === 'tmo'); let leftColumnHeight = 0; leftColumnCarriers.forEach(c => leftColumnHeight += calculateSectionHeight(c, state[c].consolidatedList)); let rightColumnHeight = 0; rightColumnCarriers.forEach(c => rightColumnHeight += calculateSectionHeight(c, state[c].consolidatedList)); const availablePageHeight = pageHeight - contentStartY - bottomMargin; const useTwoColumnLayout = (leftColumnHeight <= availablePageHeight) && (rightColumnHeight <= availablePageHeight) && (rightColumnHeight > 0); const drawSection = (carrier, data, currentX) => { doc.setFont("helvetica", "bold").setFontSize(10); const headerText = (carrier === 'apple') ? 'Apple Devices' : carrier.toUpperCase(); const headerWidth = doc.getTextWidth(headerText); doc.text(headerText, currentX, yPosition); doc.setLineWidth(0.2).line(currentX, yPosition + 0.5, currentX + headerWidth, yPosition + 0.5); yPosition += headerHeight; doc.setFontSize(8); const modelX = currentX; const detailsX = currentX + 55; data.consolidatedList.forEach(item => { const isApple = carrier === 'apple'; const modelAndCapacity = isApple ? item.modelAndCapacity : item[0]; const details = isApple ? item.details : item[1]; const sourceCarrier = isApple ? item.sourceCarrier : carrier; const emphasisState = (appState[sourceCarrier].emphasis.get(modelAndCapacity) || {}); if (emphasisState.hidden) return; doc.setFont('helvetica', 'normal'); if (emphasisState.full || emphasisState.partial) { doc.setFillColor(150, 150, 150); const textDimensions = doc.getTextDimensions(details, { fontSize: 8 }); const rectY = yPosition - textDimensions.h + 0.2; const rectHeight = textDimensions.h + 0.5; let rectWidth; if (emphasisState.full) { rectWidth = (detailsX - modelX) + textDimensions.w + 2; } else { const modelDimensions = doc.getTextDimensions(modelAndCapacity, { fontSize: 8 }); rectWidth = modelDimensions.w + 2; } doc.rect(modelX - 1, rectY, rectWidth, rectHeight, 'F'); } doc.text(modelAndCapacity, modelX, yPosition); doc.text(details, detailsX, yPosition); yPosition += lineHeight; }); yPosition += sectionSpacing; }; if (useTwoColumnLayout) { leftColumnCarriers.forEach(c => drawSection(c, state[c], sideMargin)); yPosition = contentStartY; rightColumnCarriers.forEach(c => drawSection(c, state[c], 110)); } else { carriersForLayout.forEach(carrier => { const sectionHeight = calculateSectionHeight(carrier, state[carrier].consolidatedList); if (yPosition + sectionHeight > (pageHeight - bottomMargin) && yPosition > contentStartY) { doc.addPage(); yPosition = topMargin; doc.setFont("helvetica", "normal").setFontSize(8).text(headerLines, sideMargin, yPosition); yPosition += (headerLines.length * lineHeight); if (comments) { const splitComments = doc.splitTextToSize(comments, 190); doc.setFont("helvetica", "italic").text(splitComments, sideMargin, yPosition); yPosition += (splitComments.length * (lineHeight-1)); } yPosition += sectionSpacing; } drawSection(carrier, state[carrier], sideMargin); }); } if (carriersForLayout.length === 0) { doc.setFont("helvetica", "normal").setFontSize(12).text("No inventory found.", sideMargin, yPosition); } return doc.output('datauristring'); };
+        // --- CORE LOGIC & HELPER FUNCTIONS ---
+        const getTextFromPdf = (file) => { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = async (event) => { try { const pdf = await pdfjsLib.getDocument({ data: event.target.result }).promise; let textContent = ''; for (let i = 1; i <= pdf.numPages; i++) { const page = await pdf.getPage(i); const text = await page.getTextContent(); textContent += text.items.map(s => s.str).join(' '); } resolve(textContent); } catch (error) { reject(error); } }; reader.onerror = (error) => reject(error); reader.readAsArrayBuffer(file); }); };
+        
+        const parseInventoryText = (text) => { 
+            if (!text) return { preFilterList: [], postFilterList: [] }; 
+            const dataStartIndex = text.indexOf('Quantity'); 
+            if (dataStartIndex === -1) return { preFilterList: [], postFilterList: [] }; 
+            const dataText = text.substring(dataStartIndex + 'Quantity'.length); 
+            const inventoryRegex = /(.+?)\s+(\d+\s?GB)\s+([a-zA-Z\s]+?)\s+(\d+\s+available)/g; 
+            const matches = [...dataText.matchAll(inventoryRegex)]; 
+            const preFilterList = []; 
+            const postFilterList = []; 
+            const unlockedRegex = /un\s?-?\s?lock\s?-?\s?e\s?d/i; 
+            for (const match of matches) { 
+                const model = match[1].trim(); 
+                const capacity = match[2].trim(); 
+                const modelAndCapacity = `${model} ${capacity}`; 
+                const color = match[3].trim(); 
+                const quantity = match[4].match(/\d+/)[0]; 
+                const item = [modelAndCapacity, color, quantity]; 
+                preFilterList.push(item); 
+                if (!unlockedRegex.test(match[0])) { postFilterList.push(item); } 
+            } 
+            return { preFilterList, postFilterList }; 
+        };
+        
+        const abbreviateColor = (color) => {
+            for (const [fullColor, abbrev] of Object.entries(COLOR_ABBREVIATIONS)) {
+                if (color.toLowerCase() === fullColor.toLowerCase()) return abbrev;
+            }
+            let processed = color;
+            for (const [fullColor, abbrev] of Object.entries(COLOR_ABBREVIATIONS)) {
+                const regex = new RegExp(`\\b${fullColor}\\b`, 'gi');
+                processed = processed.replace(regex, abbrev);
+            }
+            return processed;
+        };
+
+        const abbreviateModel = (model) => {
+            for (const [fullModel, abbrev] of Object.entries(DEVICE_ABBREVIATIONS)) {
+                if (model.startsWith(fullModel)) return model.replace(fullModel, abbrev);
+            }
+            return model;
+        };
+
+        const abbreviateDetails = (details) => {
+            return abbreviateColor(details); 
+        };
+
+        const consolidateInventory = (inventoryList) => { const consolidationMap = new Map(); for (const [modelAndCapacity, color, quantity] of inventoryList) { const key = modelAndCapacity; if (!consolidationMap.has(key)) { consolidationMap.set(key, { modelAndCapacity, details: [] }); } const abbreviated = abbreviateColor(color); consolidationMap.get(key).details.push({ color: abbreviated, quantity }); } const consolidatedList = []; for (const value of consolidationMap.values()) { const detailsString = value.details.map(d => `${d.quantity} ${d.color}`).join(', '); consolidatedList.push([value.modelAndCapacity, detailsString]); } return consolidatedList; };
+        
+        const categorizePdf = (text) => { const lowerCaseText = text.toLowerCase(); if (lowerCaseText.includes('at&t')) return 'att'; if (lowerCaseText.includes('verizon') || lowerCaseText.includes('vzw')) return 'vzw'; if (lowerCaseText.includes('t-mobile') || lowerCaseText.includes('tmo')) return 'tmo'; return 'unknown'; };
+        
+        const prepareDataForDisplay = () => { 
+            const preparedState = { att: {}, vzw: {}, tmo: {} }; 
+            if (isolateIphonesCheckbox.checked) { 
+                const priorityOrder = ['att', 'vzw', 'tmo']; 
+                let iphoneSource = null; 
+                for (const carrier of priorityOrder) { 
+                    if (appState[carrier].consolidatedList.some(item => item[0].toLowerCase().startsWith('iphone'))) { iphoneSource = carrier; break; } 
+                } 
+                preparedState.apple = { consolidatedList: [] }; 
+                for (const carrier of ['att', 'vzw', 'tmo']) { 
+                    preparedState[carrier].consolidatedList = appState[carrier].consolidatedList.filter(item => !item[0].toLowerCase().startsWith('iphone')); 
+                    if (carrier === iphoneSource) { 
+                        const iphones = appState[carrier].consolidatedList.filter(item => item[0].toLowerCase().startsWith('iphone')).map(item => ({ modelAndCapacity: item[0], details: item[1], sourceCarrier: carrier })); 
+                        preparedState.apple.consolidatedList = iphones; 
+                    } 
+                } 
+            } else { 
+                preparedState.att.consolidatedList = appState.att.consolidatedList; 
+                preparedState.vzw.consolidatedList = appState.vzw.consolidatedList; 
+                preparedState.tmo.consolidatedList = appState.tmo.consolidatedList; 
+            } 
+            return preparedState; 
+        };
+        
+        const generateFinalPdf = (state, comments) => {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            const topMargin = 12.7, sideMargin = 6.35, bottomMargin = 6.35;
+            const pageHeight = 297, lineHeight = 4.5, sectionSpacing = 7;
+            const headerHeight = 6, listTopMargin = 2;
+            let yPosition = topMargin;
+            
+            // Header
+            const timestamp = new Date().toLocaleString();
+            const attDate = appState.att.fileDate ? appState.att.fileDate.replace(/\/20\d{2}/, '').replace(/:\d{2}\s/, ' ') + '(ATT)' : '';
+            const vzwDate = appState.vzw.fileDate ? appState.vzw.fileDate.replace(/\/20\d{2}/, '').replace(/:\d{2}\s/, ' ') + '(VZW)' : '';
+            const tmoDate = appState.tmo.fileDate ? appState.tmo.fileDate.replace(/\/20\d{2}/, '').replace(/:\d{2}\s/, ' ') + '(TMO)' : '';
+            const inputSources = [attDate, vzwDate, tmoDate].filter(Boolean).join(', ');
+            
+            const headerLines = [
+                `${timestamp} - This inventory report was made using Spamfan's better inventory app ${APP_VERSION.slice(0, -1)}.)`,
+                "This pre-release software is in development and can make mistakes.",
+                `Inputs from ${inputSources}, EDLP information last updated on 10/17/25.`
+            ];
+            
+            doc.setFont("helvetica", "normal").setFontSize(8).text(headerLines, sideMargin, yPosition);
+            yPosition += (headerLines.length * lineHeight);
+            
+            if (comments) { const splitComments = doc.splitTextToSize(comments, 190); doc.setFont("helvetica", "italic").text(splitComments, sideMargin, yPosition); yPosition += (splitComments.length * (lineHeight - 1)); }
+            yPosition += sectionSpacing;
+            const contentStartY = yPosition;
+
+            // EDLP Layout Setup
+            const showEdlps = showEdlpsToggle.checked;
+            let modelX = sideMargin;
+            let edlpX = 0;
+            let detailsX = 0;
+            
+            if (showEdlps) {
+                edlpX = modelX + 40; 
+                detailsX = edlpX + 35;
+            } else {
+                detailsX = modelX + 55;
+            }
+
+            const calculateSectionHeight = (carrier, list) => { 
+                if (!list || list.length === 0) return 0; 
+                let visibleCount = 0; 
+                list.forEach(item => { 
+                    const model = (carrier === 'apple') ? item.modelAndCapacity : item[0]; 
+                    const source = (carrier === 'apple') ? item.sourceCarrier : carrier; 
+                    const emphasis = appState[source].emphasis.get(model) || {}; 
+                    if (!emphasis.hidden) { visibleCount++; } 
+                }); 
+                const legendHeight = showEdlps ? lineHeight : 0;
+                return headerHeight + legendHeight + listTopMargin + (visibleCount * lineHeight) + sectionSpacing; 
+            };
+
+            const carriersForLayout = Object.keys(state).filter(c => state[c].consolidatedList && state[c].consolidatedList.length > 0);
+            const leftColumnCarriers = carriersForLayout.filter(c => c !== 'apple' && c !== 'tmo');
+            const rightColumnCarriers = carriersForLayout.filter(c => c === 'apple' || c === 'tmo');
+            
+            let leftColumnHeight = 0; leftColumnCarriers.forEach(c => leftColumnHeight += calculateSectionHeight(c, state[c].consolidatedList));
+            let rightColumnHeight = 0; rightColumnCarriers.forEach(c => rightColumnHeight += calculateSectionHeight(c, state[c].consolidatedList));
+            const availablePageHeight = pageHeight - contentStartY - bottomMargin;
+            const useTwoColumnLayout = (leftColumnHeight <= availablePageHeight) && (rightColumnHeight <= availablePageHeight) && (rightColumnHeight > 0);
+
+            const drawSection = (carrier, data, currentX) => { 
+                doc.setFont("helvetica", "bold").setFontSize(10); 
+                const headerText = (carrier === 'apple') ? 'Apple Devices' : carrier.toUpperCase(); 
+                const headerWidth = doc.getTextWidth(headerText); 
+                doc.text(headerText, currentX, yPosition); 
+                doc.setLineWidth(0.2).line(currentX, yPosition + 0.5, currentX + headerWidth, yPosition + 0.5); 
+                yPosition += headerHeight; 
+                
+                if (showEdlps) {
+                    doc.setFontSize(6).setFont("helvetica", "bold").setTextColor(100);
+                    let legendEdlp = "EDLP";
+                    if (carrier === 'tmo') legendEdlp = "DP + $/mo = EDLP";
+                    else if (carrier === 'apple') legendEdlp = "EDLP ATT, VZW, TMO";
+                    
+                    const curEdlpX = currentX + 40;
+                    const curDetailsX = currentX + 75; 
+                    
+                    doc.text("ITEM", currentX, yPosition);
+                    doc.text(legendEdlp, curEdlpX, yPosition);
+                    doc.text("QTY", curDetailsX, yPosition);
+                    yPosition += lineHeight;
+                    doc.setTextColor(0);
+                }
+
+                doc.setFontSize(8); 
+                
+                data.consolidatedList.forEach(item => { 
+                    const isApple = carrier === 'apple';
+                    const rawModel = isApple ? item.modelAndCapacity : item[0];
+                    const rawDetails = isApple ? item.details : item[1];
+                    const sourceCarrier = isApple ? item.sourceCarrier : carrier;
+                    const emphasisState = (appState[sourceCarrier].emphasis.get(rawModel) || {}); 
+                    
+                    if (emphasisState.hidden) return; 
+
+                    let displayModel = rawModel;
+                    let displayDetails = rawDetails;
+                    let displayEdlp = "";
+
+                    if (showEdlps) {
+                        displayModel = abbreviateModel(rawModel);
+                        displayDetails = abbreviateDetails(rawDetails);
+                        
+                        const findPrice = (cData, mName) => {
+                             if (!cData) return null;
+                             for (const key in cData) {
+                                 if (mName.startsWith(key)) return cData[key];
+                             }
+                             return null;
+                        };
+
+                        const formatCurrency = (val) => val !== undefined ? `$${val}` : '?';
+
+                        if (isApple) {
+                           const pAtt = findPrice(EDLP_DATA.att, rawModel);
+                           const pVzw = findPrice(EDLP_DATA.vzw, rawModel);
+                           const pTmo = findPrice(EDLP_DATA.tmo, rawModel);
+                           
+                           const tAtt = pAtt && pAtt.total !== undefined ? `$${pAtt.total}` : "?";
+                           const tVzw = pVzw && pVzw.total !== undefined ? `$${pVzw.total}` : "?";
+                           const tTmo = pTmo && pTmo.total !== undefined ? `$${pTmo.total}` : "?";
+                           
+                           displayEdlp = `${tAtt}, ${tVzw}, ${tTmo}`;
+                        } else {
+                           const priceData = findPrice(EDLP_DATA[sourceCarrier], rawModel);
+                           if (!priceData) {
+                               displayEdlp = "";
+                           } else {
+                               if (sourceCarrier === 'tmo') {
+                                   displayEdlp = `${formatCurrency(priceData.dp)} + ${formatCurrency(priceData.mo)}/mo = ${formatCurrency(priceData.total)}`;
+                               } else {
+                                   displayEdlp = priceData.total !== undefined ? `$${priceData.total}` : "";
+                               }
+                           }
+                        }
+                    }
+
+                    doc.setFont('helvetica', 'normal'); 
+                    const curModelX = currentX;
+                    const curEdlpX = showEdlps ? (currentX + 40) : 0;
+                    const curDetailsX = showEdlps ? (currentX + 75) : (currentX + 55);
+
+                    if (emphasisState.full || emphasisState.partial) { 
+                        doc.setFillColor(150, 150, 150); 
+                        const textDimensions = doc.getTextDimensions(displayDetails, { fontSize: 8 }); 
+                        const rectY = yPosition - textDimensions.h + 0.2; 
+                        const rectHeight = textDimensions.h + 0.5; 
+                        let rectWidth; 
+                        if (emphasisState.full) { 
+                            const widthSpan = showEdlps ? 95 : 85; 
+                            rectWidth = widthSpan; 
+                        } else { 
+                            const modelDimensions = doc.getTextDimensions(displayModel, { fontSize: 8 }); 
+                            rectWidth = modelDimensions.w + 2; 
+                        } 
+                        doc.rect(curModelX - 1, rectY, rectWidth, rectHeight, 'F'); 
+                    } 
+                    
+                    doc.text(displayModel, curModelX, yPosition); 
+                    if (showEdlps) {
+                        doc.setFontSize(7); 
+                        doc.text(displayEdlp, curEdlpX, yPosition);
+                        doc.setFontSize(8);
+                    }
+                    doc.text(displayDetails, curDetailsX, yPosition); 
+                    yPosition += lineHeight; 
+                }); 
+                yPosition += sectionSpacing; 
+            }; 
+            
+            if (useTwoColumnLayout) { 
+                leftColumnCarriers.forEach(c => drawSection(c, state[c], sideMargin)); 
+                yPosition = contentStartY; 
+                rightColumnCarriers.forEach(c => drawSection(c, state[c], 110)); 
+            } else { 
+                carriersForLayout.forEach(carrier => { 
+                    const sectionHeight = calculateSectionHeight(carrier, state[carrier].consolidatedList); 
+                    if (yPosition + sectionHeight > (pageHeight - bottomMargin) && yPosition > contentStartY) { 
+                        doc.addPage(); 
+                        yPosition = topMargin; 
+                        doc.setFont("helvetica", "normal").setFontSize(8).text(headerLines, sideMargin, yPosition); 
+                        yPosition += (headerLines.length * lineHeight); 
+                        if (comments) { const splitComments = doc.splitTextToSize(comments, 190); doc.setFont("helvetica", "italic").text(splitComments, sideMargin, yPosition); yPosition += (splitComments.length * (lineHeight-1)); } 
+                        yPosition += sectionSpacing; 
+                    } 
+                    drawSection(carrier, state[carrier], sideMargin); 
+                }); 
+            } 
+            if (carriersForLayout.length === 0) { doc.setFont("helvetica", "normal").setFontSize(12).text("No inventory found.", sideMargin, yPosition); } 
+            return doc.output('datauristring'); 
+        };
 
         // --- EVENT HANDLER FUNCTIONS ---
-        const handleFileUploads = async (files) => { /* identical to v18 */ if (!files || files.length === 0) return; uploadArea.querySelector('p').textContent = 'Processing...'; if (devConsoleToggle.checked) devConsoleOutput.textContent = ''; for (const file of files) { try { const text = await getTextFromPdf(file); const carrier = categorizePdf(text); if (carrier === 'unknown') { alert(`Could not determine carrier for file: ${file.name}`); continue; } const { preFilterList, postFilterList } = parseInventoryText(text); appState[carrier].consolidatedList = consolidateInventory(postFilterList); const statusSection = document.getElementById(`${carrier}-status`); statusSection.querySelector('.status-filename').textContent = file.name; statusSection.style.display = 'block'; if (devConsoleToggle.checked) { let logContent = `--- DEBUG LOG FOR: ${file.name} (detected as ${carrier.toUpperCase()}) ---\n\n`; logContent += `== RAW TEXT EXTRACTED ==\n${text}\n\n`; logContent += `== ITEMS FOUND (PRE-FILTER) ==\n${preFilterList.map(item => item.join(' | ')).join('\n')}\n\n`; logContent += `== ITEMS KEPT (POST-FILTER) ==\n${postFilterList.map(item => item.join(' | ')).join('\n')}\n\n`; devConsoleOutput.textContent += logContent; } } catch (error) { alert(`Failed to process file: ${file.name}`); console.error(error); } } uploadArea.querySelector('p').textContent = 'Drag & drop files here.'; };
-        const openEmphasisModal = () => { /* identical to v17 */ const listContainer = document.getElementById('emphasis-list-container'); listContainer.innerHTML = ''; const processedData = prepareDataForDisplay(); const carriersToDisplay = Object.keys(processedData).filter(c => processedData[c].consolidatedList.length > 0); carriersToDisplay.forEach(carrier => { const header = document.createElement('div'); header.className = 'emphasis-list-carrier-header'; header.textContent = (carrier === 'apple') ? 'Apple Devices' : carrier.toUpperCase(); listContainer.appendChild(header); processedData[carrier].consolidatedList.forEach(item => { const isApple = carrier === 'apple'; const modelAndCapacity = isApple ? item.modelAndCapacity : item[0]; const details = isApple ? item.details : item[1]; const sourceCarrier = isApple ? item.sourceCarrier : carrier; const currentEmphasis = appState[sourceCarrier].emphasis.get(modelAndCapacity) || { partial: false, full: false, hidden: false }; const itemDiv = document.createElement('div'); itemDiv.className = 'emphasis-item'; if (currentEmphasis.hidden) itemDiv.classList.add('item-hidden'); const hideDiv = document.createElement('div'); hideDiv.className = 'emphasis-item-hide'; hideDiv.innerHTML = HIDE_ICON_SVG; hideDiv.dataset.key = modelAndCapacity; hideDiv.dataset.carrier = sourceCarrier; const partialCheckbox = document.createElement('input'); partialCheckbox.type = 'checkbox'; partialCheckbox.checked = currentEmphasis.partial; partialCheckbox.disabled = currentEmphasis.hidden; partialCheckbox.dataset.key = modelAndCapacity; partialCheckbox.dataset.carrier = sourceCarrier; partialCheckbox.dataset.type = 'partial'; const fullCheckbox = document.createElement('input'); fullCheckbox.type = 'checkbox'; fullCheckbox.checked = currentEmphasis.full; fullCheckbox.disabled = currentEmphasis.hidden; fullCheckbox.dataset.key = modelAndCapacity; fullCheckbox.dataset.carrier = sourceCarrier; fullCheckbox.dataset.type = 'full'; const textDiv = document.createElement('div'); textDiv.className = 'emphasis-item-text'; textDiv.textContent = `${modelAndCapacity} - ${details}`; itemDiv.appendChild(hideDiv); itemDiv.appendChild(partialCheckbox); itemDiv.appendChild(fullCheckbox); itemDiv.appendChild(textDiv); listContainer.appendChild(itemDiv); }); }); emphasisModal.style.display = 'flex'; };
+        const handleFileUploads = async (files) => { 
+            if (!files || files.length === 0) return; 
+            uploadArea.querySelector('p').textContent = 'Processing...'; 
+            if (devConsoleToggle.checked) devConsoleOutput.textContent = ''; 
+            for (const file of files) { 
+                try { 
+                    const text = await getTextFromPdf(file); 
+                    const carrier = categorizePdf(text); 
+                    if (carrier === 'unknown') { alert(`Could not determine carrier for file: ${file.name}`); continue; } 
+                    
+                    // Date Extraction
+                    const dateMatch = text.match(/Date:\s*(.*?)(?=\s+Store)/);
+                    if (dateMatch && dateMatch[1]) {
+                        appState[carrier].fileDate = dateMatch[1].trim();
+                    }
+
+                    const { preFilterList, postFilterList } = parseInventoryText(text); 
+                    appState[carrier].consolidatedList = consolidateInventory(postFilterList); 
+                    const statusSection = document.getElementById(`${carrier}-status`); 
+                    statusSection.querySelector('.status-filename').textContent = file.name; 
+                    statusSection.style.display = 'block'; 
+                    if (devConsoleToggle.checked) { 
+                        let logContent = `--- DEBUG LOG FOR: ${file.name} (detected as ${carrier.toUpperCase()}) ---\n\n`; 
+                        logContent += `== RAW TEXT EXTRACTED ==\n${text}\n\n`; 
+                        logContent += `== ITEMS FOUND (PRE-FILTER) ==\n${preFilterList.map(item => item.join(' | ')).join('\n')}\n\n`; 
+                        logContent += `== ITEMS KEPT (POST-FILTER) ==\n${postFilterList.map(item => item.join(' | ')).join('\n')}\n\n`; 
+                        devConsoleOutput.textContent += logContent; 
+                    } 
+                } catch (error) { alert(`Failed to process file: ${file.name}`); console.error(error); } 
+            } 
+            uploadArea.querySelector('p').textContent = 'Drag & drop files here.'; 
+        };
+        
+        const openEmphasisModal = () => { const listContainer = document.getElementById('emphasis-list-container'); listContainer.innerHTML = ''; const processedData = prepareDataForDisplay(); const carriersToDisplay = Object.keys(processedData).filter(c => processedData[c].consolidatedList.length > 0); carriersToDisplay.forEach(carrier => { const header = document.createElement('div'); header.className = 'emphasis-list-carrier-header'; header.textContent = (carrier === 'apple') ? 'Apple Devices' : carrier.toUpperCase(); listContainer.appendChild(header); processedData[carrier].consolidatedList.forEach(item => { const isApple = carrier === 'apple'; const modelAndCapacity = isApple ? item.modelAndCapacity : item[0]; const details = isApple ? item.details : item[1]; const sourceCarrier = isApple ? item.sourceCarrier : carrier; const currentEmphasis = appState[sourceCarrier].emphasis.get(modelAndCapacity) || { partial: false, full: false, hidden: false }; const itemDiv = document.createElement('div'); itemDiv.className = 'emphasis-item'; if (currentEmphasis.hidden) itemDiv.classList.add('item-hidden'); const hideDiv = document.createElement('div'); hideDiv.className = 'emphasis-item-hide'; hideDiv.innerHTML = HIDE_ICON_SVG; hideDiv.dataset.key = modelAndCapacity; hideDiv.dataset.carrier = sourceCarrier; const partialCheckbox = document.createElement('input'); partialCheckbox.type = 'checkbox'; partialCheckbox.checked = currentEmphasis.partial; partialCheckbox.disabled = currentEmphasis.hidden; partialCheckbox.dataset.key = modelAndCapacity; partialCheckbox.dataset.carrier = sourceCarrier; partialCheckbox.dataset.type = 'partial'; const fullCheckbox = document.createElement('input'); fullCheckbox.type = 'checkbox'; fullCheckbox.checked = currentEmphasis.full; fullCheckbox.disabled = currentEmphasis.hidden; fullCheckbox.dataset.key = modelAndCapacity; fullCheckbox.dataset.carrier = sourceCarrier; fullCheckbox.dataset.type = 'full'; const textDiv = document.createElement('div'); textDiv.className = 'emphasis-item-text'; textDiv.textContent = `${modelAndCapacity} - ${details}`; itemDiv.appendChild(hideDiv); itemDiv.appendChild(partialCheckbox); itemDiv.appendChild(fullCheckbox); itemDiv.appendChild(textDiv); listContainer.appendChild(itemDiv); }); }); emphasisModal.style.display = 'flex'; };
 
         // --- ATTACH EVENT LISTENERS ---
         highlightBtn.addEventListener('click', openEmphasisModal);
@@ -347,11 +743,14 @@
         uploadArea.addEventListener('drop', (e) => { e.preventDefault(); uploadArea.classList.remove('dragover'); handleFileUploads(e.dataTransfer.files); });
         isolateIphonesCheckbox.addEventListener('change', saveSettings);
         devConsoleToggle.addEventListener('change', () => { 
-            devConsoleContainer.style.display = devConsoleToggle.checked ? 'block' : 'none';
-            downloadBtn.style.display = devConsoleToggle.checked ? 'inline-block' : 'none';
+            const isChecked = devConsoleToggle.checked;
+            devConsoleContainer.style.display = isChecked ? 'block' : 'none';
+            downloadBtn.style.display = isChecked ? 'inline-block' : 'none';
+            edlpToggleWrapper.style.display = isChecked ? 'flex' : 'none';
+            if (!isChecked) { showEdlpsToggle.checked = false; }
         });
-        copyLogBtn.addEventListener('click', () => { /* identical to v19 */ const logText = devConsoleOutput.textContent; if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(logText).then(() => { alert('Log copied to clipboard!'); }).catch(err => { console.warn('Modern clipboard API failed, trying fallback.', err); legacyCopy(logText); }); } else { legacyCopy(logText); } });
-        const legacyCopy = (text) => { /* identical to v20 */ const textArea = document.createElement("textarea"); textArea.value = text; textArea.style.position = "fixed"; textArea.style.top = 0; textArea.style.left = 0; textArea.style.opacity = 0; document.body.appendChild(textArea); textArea.focus(); textArea.select(); try { const successful = document.execCommand('copy'); if (!successful) { alert('Failed to copy log.'); } } catch (err) { alert('Failed to copy log.'); } document.body.removeChild(textArea); };
+        copyLogBtn.addEventListener('click', () => { const logText = devConsoleOutput.textContent; if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(logText).then(() => { alert('Log copied to clipboard!'); }).catch(err => { console.warn('Modern clipboard API failed, trying fallback.', err); legacyCopy(logText); }); } else { legacyCopy(logText); } });
+        const legacyCopy = (text) => { const textArea = document.createElement("textarea"); textArea.value = text; textArea.style.position = "fixed"; textArea.style.top = 0; textArea.style.left = 0; textArea.style.opacity = 0; document.body.appendChild(textArea); textArea.focus(); textArea.select(); try { const successful = document.execCommand('copy'); if (!successful) { alert('Failed to copy log.'); } } catch (err) { alert('Failed to copy log.'); } document.body.removeChild(textArea); };
         
         previewCloseBtn.addEventListener('click', () => previewModal.style.display = 'none');
         emphasisCloseBtn.addEventListener('click', () => emphasisModal.style.display = 'none');
@@ -360,11 +759,11 @@
         window.addEventListener('click', (event) => { if (event.target == previewModal) previewModal.style.display = 'none'; if (event.target == emphasisModal) emphasisModal.style.display = 'none'; if (event.target == devModeModal && devModalCloseable.backdrop) devModeModal.style.display = 'none'; });
         downloadBtn.addEventListener('click', () => { const link = document.createElement('a'); link.href = iframe.src; link.download = 'Combined_Inventory.pdf'; link.click(); });
         
-        emphasisModal.addEventListener('click', (e) => { /* identical to v16 */ const target = e.target.closest('.emphasis-item-hide'); if (!target) return; const { key, carrier } = target.dataset; const state = appState[carrier].emphasis.get(key) || { partial: false, full: false }; state.hidden = !state.hidden; appState[carrier].emphasis.set(key, state); const parentItem = target.closest('.emphasis-item'); parentItem.classList.toggle('item-hidden'); parentItem.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.disabled = state.hidden); saveSettings(); });
-        emphasisModal.addEventListener('change', (e) => { /* identical to v16 */ const target = e.target; if (target.type !== 'checkbox') return; const isMaster = target.id.startsWith('master-'); if (isMaster) { const masterType = target.id.includes('partial') ? 'partial' : 'full'; const isChecking = target.checked; const allItems = emphasisModal.querySelectorAll('.emphasis-item:not(.item-hidden)'); allItems.forEach(item => { const partialBox = item.querySelector('[data-type="partial"]'); const fullBox = item.querySelector('[data-type="full"]'); const key = partialBox.dataset.key; const carrier = partialBox.dataset.carrier; const state = appState[carrier].emphasis.get(key) || { partial: false, full: false }; if (masterType === 'partial') { partialBox.checked = isChecking; state.partial = isChecking; if (!isChecking) { fullBox.checked = false; state.full = false; } } else { fullBox.checked = isChecking; state.full = isChecking; if (isChecking) { partialBox.checked = true; state.partial = true; } } appState[carrier].emphasis.set(key, state); }); const masterPartial = document.getElementById('master-partial-checkbox'); const masterFull = document.getElementById('master-full-checkbox'); if (masterType === 'full' && isChecking) masterPartial.checked = true; if (masterType === 'partial' && !isChecking) masterFull.checked = false; } else if (target.dataset.key) { const { key, carrier, type } = target.dataset; const state = appState[carrier].emphasis.get(key) || { partial: false, full: false }; state[type] = target.checked; const parentItem = target.closest('.emphasis-item'); if (parentItem) { const partialBox = parentItem.querySelector('[data-type="partial"]'); const fullBox = parentItem.querySelector('[data-type="full"]'); if (type === 'full' && target.checked) { state.partial = true; if (partialBox) partialBox.checked = true; } if (type === 'partial' && !target.checked) { state.full = false; if (fullBox) fullBox.checked = false; } } appState[carrier].emphasis.set(key, state); } saveSettings(); });
+        emphasisModal.addEventListener('click', (e) => { const target = e.target.closest('.emphasis-item-hide'); if (!target) return; const { key, carrier } = target.dataset; const state = appState[carrier].emphasis.get(key) || { partial: false, full: false }; state.hidden = !state.hidden; appState[carrier].emphasis.set(key, state); const parentItem = target.closest('.emphasis-item'); parentItem.classList.toggle('item-hidden'); parentItem.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.disabled = state.hidden); saveSettings(); });
+        emphasisModal.addEventListener('change', (e) => { const target = e.target; if (target.type !== 'checkbox') return; const isMaster = target.id.startsWith('master-'); if (isMaster) { const masterType = target.id.includes('partial') ? 'partial' : 'full'; const isChecking = target.checked; const allItems = emphasisModal.querySelectorAll('.emphasis-item:not(.item-hidden)'); allItems.forEach(item => { const partialBox = item.querySelector('[data-type="partial"]'); const fullBox = item.querySelector('[data-type="full"]'); const key = partialBox.dataset.key; const carrier = partialBox.dataset.carrier; const state = appState[carrier].emphasis.get(key) || { partial: false, full: false }; if (masterType === 'partial') { partialBox.checked = isChecking; state.partial = isChecking; if (!isChecking) { fullBox.checked = false; state.full = false; } } else { fullBox.checked = isChecking; state.full = isChecking; if (isChecking) { partialBox.checked = true; state.partial = true; } } appState[carrier].emphasis.set(key, state); }); const masterPartial = document.getElementById('master-partial-checkbox'); const masterFull = document.getElementById('master-full-checkbox'); if (masterType === 'full' && isChecking) masterPartial.checked = true; if (masterType === 'partial' && !isChecking) masterFull.checked = false; } else if (target.dataset.key) { const { key, carrier, type } = target.dataset; const state = appState[carrier].emphasis.get(key) || { partial: false, full: false }; state[type] = target.checked; const parentItem = target.closest('.emphasis-item'); if (parentItem) { const partialBox = parentItem.querySelector('[data-type="partial"]'); const fullBox = parentItem.querySelector('[data-type="full"]'); if (type === 'full' && target.checked) { state.partial = true; if (partialBox) partialBox.checked = true; } if (type === 'partial' && !target.checked) { state.full = false; if (fullBox) fullBox.checked = false; } } appState[carrier].emphasis.set(key, state); } saveSettings(); });
         
         let clickCount = 0, lastClick = 0;
-        versionSpan.addEventListener('click', () => { /* identical to v16 */ const now = Date.now(); if (now - lastClick > 500) { clickCount = 0; } lastClick = now; clickCount++; if (clickCount === 7) { devModalCloseable.button = false; devModalCloseable.backdrop = false; devModeModal.style.display = 'flex'; setTimeout(() => { devModalCloseable.button = true; }, 500); setTimeout(() => { devModalCloseable.backdrop = true; }, 1000); clickCount = 0; } });
+        versionSpan.addEventListener('click', () => { const now = Date.now(); if (now - lastClick > 500) { clickCount = 0; } lastClick = now; clickCount++; if (clickCount === 7) { devModalCloseable.button = false; devModalCloseable.backdrop = false; devModeModal.style.display = 'flex'; setTimeout(() => { devModalCloseable.button = true; }, 500); setTimeout(() => { devModalCloseable.backdrop = true; }, 1000); clickCount = 0; } });
         commentsInput.addEventListener('input', (e) => { const konami = "upupdowndownleftrightleftrightba"; const input = e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''); konamiMessage.style.display = input.includes(konami) ? 'block' : 'none'; });
 
         // Initial load of settings from localStorage
