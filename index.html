@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spamfan's inventory optimizer (alpha v25)</title>
+    <title>Spamfan's inventory optimizer (alpha v29)</title>
     
     <!-- PDF.js and jsPDF library CDNs -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
@@ -211,7 +211,7 @@
             </div>
             <div class="toggle-option" id="edlp-toggle-wrapper">
                 <input type="checkbox" id="show-edlps-toggle">
-                <label for="show-edlps-toggle">Show EDLPs (10/17/25)</label>
+                <label for="show-edlps-toggle">Show EDLPs (updated 10/17/25)</label>
             </div>
         </div>
         
@@ -242,11 +242,12 @@
     <script>
     document.addEventListener('DOMContentLoaded', () => {
         // --- SCRIPT INITIALIZATION ---
-        const APP_VERSION = '(Alpha v25)';
+        const APP_VERSION = '(Alpha v29)';
         document.getElementById('version-span').textContent = APP_VERSION;
         pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js`;
         const HIDE_ICON_SVG = `<svg class="hide-icon inline-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M11.83,9.53c1.53,0.24,2.74,1.46,2.98,2.98L11.83,9.53z M12,6c3.79,0,7.17,2.13,8.82,5.5c-0.64,1.32-1.57,2.44-2.68,3.32l1.42,1.42c1.51-1.26,2.7-2.89,3.43-4.74C21.27,7.11,17,4,12,4c-1.4,0-2.73,0.25-3.98,0.7L9.63,6.3C10.4,6.12,11.19,6,12,6z M2,4.27l3.11,3.11C3.26,8.9,2.42,10.36,2.03,11.5C3.73,15.89,7.5,18,12,18c1.55,0,3.03-0.3,4.38-0.84l2.1,2.1L20,18.73L3.27,2L2,4.27z M7.53,9.8l1.55,1.55C9.03,11.49,9,11.74,9,12c0,1.66,1.34,3,3,3c0.26,0,0.51-0.03,0.75-0.08l1.55,1.55C13.96,15.86,13,16,12,16c-2.76,0-5-2.24-5-5C7,10.54,7.14,9.96,7.53,9.8z"/></svg>`;
         const MORE_OPTIONS_SVG = `<svg class="inline-svg" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="#606770"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg>`;
+        
         document.getElementById('how-to-use-container').innerHTML = `
             <h3><strong>Heads up! This software is still in development and can make mistakes.</strong></h3>
             <h4><strong>HOW TO USE</strong></h4>
@@ -254,8 +255,8 @@
                 <li><strong>Save Each Carrier's Inventory as a PDF</strong>
                     <ul>
                         <li>CRITICAL: You must open WARP in a new, separate window (Ctrl + N). The optimizer will not accept file inputs if WARP is only in a separate tab.</li>
-                        <li>In the new WARP window, navigate to: Manage Inventory > Inventory Reports.</li>
-                        <li>Select AT&T, click the More Options (${MORE_OPTIONS_SVG}) menu, and choose Print.</li>
+                        <li>In the new WARP window, navigate to: Inventory Management > View Available Inventory.</li>
+                        <li>Select AT&T, make sure the "Instock" box is checked, then click More Options (${MORE_OPTIONS_SVG}) and choose Print.</li>
                         <li>Change the "Destination" printer from "CPR1" to Save as PDF.
                             <ul><li>Note: For best results, use the original formatting (100% scale and default margins), as this has passed user testing.</li></ul>
                         </li>
@@ -303,7 +304,8 @@
         // --- EDLP DATA & ABBREVIATIONS ---
         const DEVICE_ABBREVIATIONS = {
             'Classic': 'Classic', 'Galaxy A03': 'A03', 'Galaxy A13 LTE': 'A13', 'Galaxy A15 5G': 'A15', 'Galaxy A16 5G': 'A16', 'Galaxy A35 5G': 'A35', 'Galaxy S24 FE': '24FE', 'Galaxy S25 FE': '25FE', 'Galaxy S25 Plus 5G': '25+', 'Galaxy S25 Ultra 5G': 'S25U', 'Galaxy Z Flip 4 5G': 'GZF4',
-            'iPhone 15': 'IP15', 'iPhone 16': 'IP16', 'iPhone 16 Plus': '16+', 'iPhone 16 Pro': '16PR', 'iPhone 16 Pro Max': '16PM', 'iPhone 16e': '16e', 'iPhone 17': 'IP17', 'iPhone 17 Pro': '17PR', 'iPhone 17 Pro Max': '17PM', 'iPhone Air': 'AIR',
+            'iPhone 15': 'IP15', 'iPhone 16 Pro Max': 'IP16PM', 'iPhone 16 Pro': 'IP16PR', 'iPhone 16 Plus': 'IP16+', 'iPhone 16e': '16e', 'iPhone 16': 'IP16', 
+            'iPhone 17 Pro Max': 'IP17PM', 'iPhone 17 Pro': 'IP17PR', 'iPhone 17': 'IP17', 'iPhone Air': 'IP AIR',
             'Moto G 5G 2024': 'MG24', 'Moto G 5G 2025': 'MG25', 'Moto G Power 2024': 'PWR24', 'Moto G Power 2025': 'PWR25', 'Moto G Stylus 2024': 'STY24', 'Moto G Stylus 2025': 'GS25', 'One Ace 5G': 'ACE', 'REVVL 6': 'REV6', 'TCL Flip 3': 'Flip3'
         };
 
@@ -464,8 +466,10 @@
         };
 
         const abbreviateModel = (model) => {
-            for (const [fullModel, abbrev] of Object.entries(DEVICE_ABBREVIATIONS)) {
-                if (model.startsWith(fullModel)) return model.replace(fullModel, abbrev);
+            // Sort keys by length desc to match longest first
+            const sortedModels = Object.keys(DEVICE_ABBREVIATIONS).sort((a, b) => b.length - a.length);
+            for (const fullModel of sortedModels) {
+                if (model.startsWith(fullModel)) return model.replace(fullModel, DEVICE_ABBREVIATIONS[fullModel]);
             }
             return model;
         };
@@ -510,21 +514,24 @@
             const headerHeight = 6, listTopMargin = 2;
             let yPosition = topMargin;
             
-            // Header
-            const timestamp = new Date().toLocaleString();
-            const attDate = appState.att.fileDate ? appState.att.fileDate.replace(/\/20\d{2}/, '').replace(/:\d{2}\s/, ' ') + '(ATT)' : '';
-            const vzwDate = appState.vzw.fileDate ? appState.vzw.fileDate.replace(/\/20\d{2}/, '').replace(/:\d{2}\s/, ' ') + '(VZW)' : '';
-            const tmoDate = appState.tmo.fileDate ? appState.tmo.fileDate.replace(/\/20\d{2}/, '').replace(/:\d{2}\s/, ' ') + '(TMO)' : '';
-            const inputSources = [attDate, vzwDate, tmoDate].filter(Boolean).join(', ');
+            // Header - Single Line
+            const dateNow = new Date();
+            const dateStr = dateNow.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+            const timeStr = dateNow.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).toLowerCase().replace(' ', '');
             
-            const headerLines = [
-                `${timestamp} - This inventory report was made using Spamfan's better inventory app ${APP_VERSION.slice(0, -1)}.)`,
-                "This pre-release software is in development and can make mistakes.",
-                `Inputs from ${inputSources}, EDLP information last updated on 10/17/25.`
-            ];
+            doc.setFont("helvetica", "normal").setFontSize(8);
+            const part1 = "Created on ";
+            const part2 = `${dateStr} ${timeStr}`;
+            const part3 = ". This software is experimental and can make mistakes.";
             
-            doc.setFont("helvetica", "normal").setFontSize(8).text(headerLines, sideMargin, yPosition);
-            yPosition += (headerLines.length * lineHeight);
+            doc.text(part1, sideMargin, yPosition);
+            const w1 = doc.getTextWidth(part1);
+            doc.setFont("helvetica", "bold");
+            doc.text(part2, sideMargin + w1, yPosition);
+            const w2 = doc.getTextWidth(part2);
+            doc.setFont("helvetica", "normal");
+            doc.text(part3, sideMargin + w1 + w2, yPosition);
+            yPosition += lineHeight;
             
             if (comments) { const splitComments = doc.splitTextToSize(comments, 190); doc.setFont("helvetica", "italic").text(splitComments, sideMargin, yPosition); yPosition += (splitComments.length * (lineHeight - 1)); }
             yPosition += sectionSpacing;
@@ -537,7 +544,7 @@
             let detailsX = 0;
             
             if (showEdlps) {
-                edlpX = modelX + 40; 
+                edlpX = modelX + 25; 
                 detailsX = edlpX + 35;
             } else {
                 detailsX = modelX + 55;
@@ -552,7 +559,10 @@
                     const emphasis = appState[source].emphasis.get(model) || {}; 
                     if (!emphasis.hidden) { visibleCount++; } 
                 }); 
-                const legendHeight = showEdlps ? lineHeight : 0;
+                let legendHeight = 0;
+                if (showEdlps) {
+                    legendHeight = (carrier === 'apple' && isolateIphonesCheckbox.checked) ? lineHeight * 2 : lineHeight;
+                }
                 return headerHeight + legendHeight + listTopMargin + (visibleCount * lineHeight) + sectionSpacing; 
             };
 
@@ -562,7 +572,7 @@
             
             let leftColumnHeight = 0; leftColumnCarriers.forEach(c => leftColumnHeight += calculateSectionHeight(c, state[c].consolidatedList));
             let rightColumnHeight = 0; rightColumnCarriers.forEach(c => rightColumnHeight += calculateSectionHeight(c, state[c].consolidatedList));
-            const availablePageHeight = pageHeight - contentStartY - bottomMargin;
+            const availablePageHeight = pageHeight - contentStartY - bottomMargin - 15; 
             const useTwoColumnLayout = (leftColumnHeight <= availablePageHeight) && (rightColumnHeight <= availablePageHeight) && (rightColumnHeight > 0);
 
             const drawSection = (carrier, data, currentX) => { 
@@ -574,19 +584,28 @@
                 yPosition += headerHeight; 
                 
                 if (showEdlps) {
-                    doc.setFontSize(6).setFont("helvetica", "bold").setTextColor(100);
-                    let legendEdlp = "EDLP";
-                    if (carrier === 'tmo') legendEdlp = "DP + $/mo = EDLP";
-                    else if (carrier === 'apple') legendEdlp = "EDLP ATT, VZW, TMO";
+                    doc.setFontSize(6).setFont("helvetica", "bold");
+                    const curEdlpX = currentX + 25; 
+                    const curDetailsX = currentX + 60; 
                     
-                    const curEdlpX = currentX + 40;
-                    const curDetailsX = currentX + 75; 
-                    
-                    doc.text("ITEM", currentX, yPosition);
-                    doc.text(legendEdlp, curEdlpX, yPosition);
-                    doc.text("QTY", curDetailsX, yPosition);
-                    yPosition += lineHeight;
-                    doc.setTextColor(0);
+                    if (carrier === 'apple') {
+                        doc.text("EDLPs", curEdlpX, yPosition);
+                        yPosition += lineHeight; // Move down
+                        doc.text("ITEM", currentX, yPosition);
+                        doc.text("(ATT, VZW, TMO)", curEdlpX, yPosition);
+                        doc.text("QTY", curDetailsX, yPosition);
+                        yPosition += lineHeight;
+                    } else if (carrier === 'tmo') {
+                        doc.text("ITEM", currentX, yPosition);
+                        doc.text("DP + $/mo = EDLP", curEdlpX, yPosition);
+                        doc.text("QTY", curDetailsX, yPosition);
+                        yPosition += lineHeight;
+                    } else {
+                        doc.text("ITEM", currentX, yPosition);
+                        doc.text("EDLP", curEdlpX, yPosition);
+                        doc.text("QTY", curDetailsX, yPosition);
+                        yPosition += lineHeight;
+                    }
                 }
 
                 doc.setFontSize(8); 
@@ -616,16 +635,16 @@
                              return null;
                         };
 
-                        const formatCurrency = (val) => val !== undefined ? `$${val}` : '?';
+                        const formatCurrency = (val) => val !== undefined ? `$${val}` : '$??';
 
                         if (isApple) {
                            const pAtt = findPrice(EDLP_DATA.att, rawModel);
                            const pVzw = findPrice(EDLP_DATA.vzw, rawModel);
                            const pTmo = findPrice(EDLP_DATA.tmo, rawModel);
                            
-                           const tAtt = pAtt && pAtt.total !== undefined ? `$${pAtt.total}` : "?";
-                           const tVzw = pVzw && pVzw.total !== undefined ? `$${pVzw.total}` : "?";
-                           const tTmo = pTmo && pTmo.total !== undefined ? `$${pTmo.total}` : "?";
+                           const tAtt = pAtt && pAtt.total !== undefined ? `$${pAtt.total}` : "$???";
+                           const tVzw = pVzw && pVzw.total !== undefined ? `$${pVzw.total}` : "$???";
+                           const tTmo = pTmo && pTmo.total !== undefined ? `$${pTmo.total}` : "$???";
                            
                            displayEdlp = `${tAtt}, ${tVzw}, ${tTmo}`;
                         } else {
@@ -644,8 +663,8 @@
 
                     doc.setFont('helvetica', 'normal'); 
                     const curModelX = currentX;
-                    const curEdlpX = showEdlps ? (currentX + 40) : 0;
-                    const curDetailsX = showEdlps ? (currentX + 75) : (currentX + 55);
+                    const curEdlpX = showEdlps ? (currentX + 25) : 0;
+                    const curDetailsX = showEdlps ? (currentX + 60) : (currentX + 55);
 
                     if (emphasisState.full || emphasisState.partial) { 
                         doc.setFillColor(150, 150, 150); 
@@ -682,18 +701,37 @@
             } else { 
                 carriersForLayout.forEach(carrier => { 
                     const sectionHeight = calculateSectionHeight(carrier, state[carrier].consolidatedList); 
-                    if (yPosition + sectionHeight > (pageHeight - bottomMargin) && yPosition > contentStartY) { 
+                    if (yPosition + sectionHeight > (pageHeight - bottomMargin - 15) && yPosition > contentStartY) { 
                         doc.addPage(); 
                         yPosition = topMargin; 
-                        doc.setFont("helvetica", "normal").setFontSize(8).text(headerLines, sideMargin, yPosition); 
-                        yPosition += (headerLines.length * lineHeight); 
-                        if (comments) { const splitComments = doc.splitTextToSize(comments, 190); doc.setFont("helvetica", "italic").text(splitComments, sideMargin, yPosition); yPosition += (splitComments.length * (lineHeight-1)); } 
-                        yPosition += sectionSpacing; 
                     } 
                     drawSection(carrier, state[carrier], sideMargin); 
                 }); 
             } 
             if (carriersForLayout.length === 0) { doc.setFont("helvetica", "normal").setFontSize(12).text("No inventory found.", sideMargin, yPosition); } 
+            
+            // Footer
+            const footerY = pageHeight - 10;
+            doc.setFontSize(8);
+            
+            // Line 1
+            doc.setFont("helvetica", "normal");
+            doc.text(`Made with SIO ${APP_VERSION}, an experimental and unofficial work app created by Abraham.`, sideMargin, footerY - 4);
+
+            // Line 2
+            const attDate = appState.att.fileDate ? appState.att.fileDate.replace(/\/20\d{2}/, '').replace(/:\d{2}\s/, ' ') : '';
+            const vzwDate = appState.vzw.fileDate ? appState.vzw.fileDate.replace(/\/20\d{2}/, '').replace(/:\d{2}\s/, ' ') : '';
+            const tmoDate = appState.tmo.fileDate ? appState.tmo.fileDate.replace(/\/20\d{2}/, '').replace(/:\d{2}\s/, ' ') : '';
+            
+            const fBold = "Sources: ";
+            const fNormal = `ATT (${attDate || 'N/A'}), VZW (${vzwDate || 'N/A'}), TMO (${tmoDate || 'N/A'})`;
+            
+            doc.setFont("helvetica", "bold");
+            doc.text(fBold, sideMargin, footerY);
+            const fWidth = doc.getTextWidth(fBold);
+            doc.setFont("helvetica", "normal");
+            doc.text(fNormal, sideMargin + fWidth, footerY);
+
             return doc.output('datauristring'); 
         };
 
